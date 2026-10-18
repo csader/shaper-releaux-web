@@ -40,7 +40,7 @@ const ANCHOR_GRID: { position: AnchorPosition; label: string }[] = [
   { position: "bottom-right", label: "Bottom right" },
 ];
 
-const DEFAULT_ANCHOR: AnchorConfig = { enabled: false, position: "center" };
+const DEFAULT_ANCHOR: AnchorConfig = { enabled: true, position: "center" };
 
 const DEFAULTS: BowlParams = {
   sides: 5,
@@ -57,6 +57,7 @@ const DEFAULTS: BowlParams = {
   exteriorModel: "circumferential",
   footRelief: true,
   maxPathsPerFile: 250,
+  anchor: DEFAULT_ANCHOR,
 };
 
 function NumberField({
