@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { MAX_CANDIDATES, parseCandidateLoops, type Candidate } from "../../import/parseSvg";
+import { extractDeclaredSizeMm, MAX_CANDIDATES, parseCandidateLoops, type Candidate } from "../../import/parseSvg";
 import {
   compoundShapeToPathData,
   holeIsContained,
@@ -16,6 +16,8 @@ interface Props {
   mmCut: number;
   outerDiameter: number;
   onImport: (shape: CompoundShape | null) => void;
+  /** Called with the file's declared real-world width (mm), when it has one. */
+  onSuggestedWidth?: (mm: number) => void;
 }
 
 const PREVIEW_SCALES = [1, 0.5, 0.1];
@@ -36,11 +38,15 @@ function holesOverlap(a: Loop, b: Loop): boolean {
   return holeIsContained(a, b) || holeIsContained(b, a) || !isSimplePolygon([...a, ...b]);
 }
 
-export function CustomShapeImport({ bitSize, mmCut, outerDiameter, onImport }: Props) {
+export function CustomShapeImport({ bitSize, mmCut, outerDiameter, onImport, onSuggestedWidth }: Props) {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [outerId, setOuterId] = useState<string | null>(null);
   const [holeIds, setHoleIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  // null = no file uploaded yet; "none" = uploaded but it declares no physical units
+  // (bare number / px / nothing) — distinguishes "haven't tried" from "tried, found
+  // nothing", so the no-units warning only shows after an actual upload.
+  const [declaredSize, setDeclaredSize] = useState<{ widthMm: number; heightMm: number } | "none" | null>(null);
 
   const outerCandidate = candidates.find((c) => c.id === outerId) ?? null;
   const holeCandidates = candidates.filter((c) => holeIds.has(c.id));
@@ -119,6 +125,7 @@ export function CustomShapeImport({ bitSize, mmCut, outerDiameter, onImport }: P
   function handleFile(file: File) {
     setError(null);
     setCandidates([]);
+    setDeclaredSize(null);
     const reader = new FileReader();
     reader.onload = () => {
       try {
@@ -144,6 +151,14 @@ export function CustomShapeImport({ bitSize, mmCut, outerDiameter, onImport }: P
               "import. Try a file with just one or two shapes (an outline, plus maybe a hole).",
           );
           return;
+        }
+
+        const size = extractDeclaredSizeMm(text);
+        if (size) {
+          setDeclaredSize(size);
+          onSuggestedWidth?.(size.widthMm);
+        } else {
+          setDeclaredSize("none");
         }
         const sorted = [...found].sort((a, b) => b.area - a.area);
         const suggestedOuter = sorted[0];
@@ -178,6 +193,19 @@ export function CustomShapeImport({ bitSize, mmCut, outerDiameter, onImport }: P
         }}
       />
       {error && <p className="error-note">{error}</p>}
+
+      {declaredSize && declaredSize !== "none" && (
+        <p className="hint-note">
+          Detected real-world size: {declaredSize.widthMm.toFixed(1)}mm × {declaredSize.heightMm.toFixed(1)}mm —
+          Outer Diameter pre-filled below (you can still change it).
+        </p>
+      )}
+      {declaredSize === "none" && (
+        <p className="warning-note">
+          This file doesn't declare physical units (mm/in/etc.) for its size — only its proportions were used.
+          Set Outer Diameter below to the real-world size you want.
+        </p>
+      )}
 
       {candidates.length === 1 && <p className="hint-note">1 closed shape found — using it as the outline.</p>}
 

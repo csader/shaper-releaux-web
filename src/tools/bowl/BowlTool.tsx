@@ -146,6 +146,7 @@ export function BowlTool({ unit }: { unit: Unit }) {
               mmCut={params.mmCut}
               outerDiameter={params.outerDiameter}
               onImport={(shape) => set("customShape", shape ?? undefined)}
+              onSuggestedWidth={(mm) => set("outerDiameter", mm)}
             />
             <p className="hint-note">
               Custom shapes can produce large files with the circumferential model — radial is a lighter default

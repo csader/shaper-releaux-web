@@ -17,6 +17,47 @@ export interface Candidate {
   area: number;
 }
 
+export interface DeclaredSize {
+  widthMm: number;
+  heightMm: number;
+}
+
+const UNIT_TO_MM: Record<string, number> = {
+  mm: 1,
+  cm: 10,
+  in: 25.4,
+  pt: 25.4 / 72,
+  pc: 25.4 / 6,
+};
+
+function parseLengthMm(raw: string | null | undefined): number | null {
+  if (!raw) return null;
+  const match = raw.trim().match(/^([\d.]+)\s*(mm|cm|in|pt|pc)$/i);
+  if (!match) return null; // bare numbers / px / % aren't reliably physical — see below
+  const value = parseFloat(match[1]);
+  const unit = match[2].toLowerCase();
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return value * UNIT_TO_MM[unit];
+}
+
+/**
+ * Reads the root <svg>'s declared width/height as real-world mm, if (and only if) it
+ * declares an explicit physical unit (mm/cm/in/pt/pc) — a bare number or "px" doesn't
+ * reliably mean anything physical (most design-tool exports default to screen-pixel
+ * dimensions with no relation to intended real-world size), so those are deliberately
+ * left alone rather than guessed at. Pure string parsing, not DOM-dependent, so this
+ * one (unlike the rest of this file) is unit-tested.
+ */
+export function extractDeclaredSizeMm(svgText: string): DeclaredSize | null {
+  const tagMatch = svgText.match(/<svg\b[^>]*>/);
+  if (!tagMatch) return null;
+  const tag = tagMatch[0];
+  const widthMm = parseLengthMm(tag.match(/\bwidth="([^"]+)"/)?.[1]);
+  const heightMm = parseLengthMm(tag.match(/\bheight="([^"]+)"/)?.[1]);
+  if (widthMm === null || heightMm === null) return null;
+  return { widthMm, heightMm };
+}
+
 const SHAPE_SELECTOR = "path, polygon, polyline, rect, circle, ellipse";
 const MAX_POINTS_PER_LOOP = 200;
 const MIN_ARC_LENGTH_STEP = 0.5; // in the element's own user units
