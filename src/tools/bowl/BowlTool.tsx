@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import { generateBowl, type BowlParams } from "./generate";
+import { CustomShapeImport } from "./CustomShapeImport";
 import type { Sides } from "../../geometry/shapes";
 import type { SteppingModel } from "../../geometry/profile";
 import { downloadAllAsZip, downloadFile } from "../../download/download";
 import { displayToMm, mmToDisplay, unitLabel, type Unit } from "../../units";
 
-const SIDE_LABELS: Record<Sides, string> = {
+const SIDE_LABELS: Record<Sides | "custom", string> = {
   1: "1 — Circle / Ellipse",
   2: "2 — Heart",
   3: "3 — Reuleaux triangle",
@@ -13,6 +14,7 @@ const SIDE_LABELS: Record<Sides, string> = {
   5: "5 — Reuleaux pentagon",
   6: "6 — Hexagon",
   7: "7 — Reuleaux heptagon",
+  custom: "Custom (import SVG)",
 };
 
 const DEFAULTS: BowlParams = {
@@ -85,15 +87,17 @@ export function BowlTool({ unit }: { unit: Unit }) {
     setParams((p) => ({ ...p, [key]: value }));
 
   const supportsIndependentAxes = params.sides === 1 || params.sides === 4;
+  const isCustom = params.sides === "custom";
 
   const files = useMemo(() => {
+    if (isCustom && !params.customShape) return [];
     try {
       return generateBowl(params);
     } catch (e) {
       console.error(e);
       return [];
     }
-  }, [params]);
+  }, [params, isCustom]);
 
   const exteriorPreview = files.find((f) => f.name.startsWith("ReuleauxExterior") && !f.name.includes("Roughing"));
   const interiorPreview = files.find((f) => f.name.startsWith("ReuleauxInterior") && !f.name.includes("Roughing"));
@@ -106,9 +110,11 @@ export function BowlTool({ unit }: { unit: Unit }) {
           <select
             value={params.sides}
             onChange={(e) => {
-              const sides = Number(e.target.value) as Sides;
+              const raw = e.target.value;
+              const sides = raw === "custom" ? "custom" : (Number(raw) as Sides);
               set("sides", sides);
               if (sides !== 1 && sides !== 4) setIndependentAxes(false);
+              if (sides !== "custom") set("customShape", undefined);
             }}
           >
             {Object.entries(SIDE_LABELS).map(([n, label]) => (
@@ -118,6 +124,21 @@ export function BowlTool({ unit }: { unit: Unit }) {
             ))}
           </select>
         </label>
+
+        {isCustom && (
+          <>
+            <CustomShapeImport
+              bitSize={params.bitSize}
+              mmCut={params.mmCut}
+              outerDiameter={params.outerDiameter}
+              onImport={(shape) => set("customShape", shape ?? undefined)}
+            />
+            <p className="hint-note">
+              Custom shapes can produce large files with the circumferential model — radial is a lighter default
+              here.
+            </p>
+          </>
+        )}
 
         {supportsIndependentAxes && (
           <label className="field checkbox-field">

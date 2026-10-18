@@ -13,9 +13,12 @@ import { outlineToPathData } from "../../svg/path";
 import { buildShaperSvg, type CutPath } from "../../svg/shaperSvg";
 import { splitIntoChunks } from "../../svg/fileSplit";
 import type { GeneratedFile } from "../../types";
+import { compoundShapeToPathData, scaleCompoundShape, type CompoundShape } from "../../geometry/customShape";
 
 export interface BowlParams {
-  sides: Sides;
+  sides: Sides | "custom";
+  /** Required when sides === "custom" — normalized shape from the import picker. */
+  customShape?: CompoundShape;
   outerDiameter: number;
   /** Independent Y dimension for sides=1 (ellipse) or sides=4 (rectangle special case). */
   outerDiameterY?: number;
@@ -41,6 +44,7 @@ function minCuttableDiameter(bitSize: number, mmCut: number): number {
 export function generateBowl(params: BowlParams): GeneratedFile[] {
   const {
     sides,
+    customShape,
     outerDiameter,
     outerDiameterY,
     innerDiameter,
@@ -56,6 +60,10 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
     exteriorModel,
   } = params;
 
+  if (sides === "custom" && !customShape) {
+    throw new Error("A custom shape must be provided when sides is \"custom\".");
+  }
+
   const footAngle = footAngleDeg(outerDiameter, footDiameter);
   const boundingWidth = outerDiameter + 2 * bitSize;
   const boundingHeight = (outerDiameterY ?? outerDiameter) + 2 * bitSize;
@@ -66,9 +74,25 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
   const minCuttable = minCuttableDiameter(bitSize, mmCut);
   // Independent-axis shapes (ellipse n=1, rectangle n=4) scale the Y extent by this
   // same ratio at every ring — the single θ-driven profile scale factor applies
-  // uniformly to both axes, just against different base dimensions.
+  // uniformly to both axes, just against different base dimensions. Custom imported
+  // shapes already bake their own aspect ratio into the normalized form, so they
+  // don't need this — scaleCompoundShape applies one uniform factor to both axes.
   const outerAspectY = (outerDiameterY ?? outerDiameter) / outerDiameter;
   const innerAspectY = (innerDiameterY ?? innerDiameter) / innerDiameter;
+
+  /** Builds the `d` string for one ring, dispatching between the native arc-based
+   * shapes and a custom imported (possibly multi-loop) shape. `dyScale` is ignored
+   * for custom shapes (their own proportions are already baked in). `reversed`
+   * matches the native `sweep` convention: false = normal, true = opposite winding
+   * (used for the roughing pocket's inner "kept" shape). */
+  const ringPathData = (D: number, dyScale: number, reversed: boolean): string => {
+    if (sides === "custom") {
+      const scaled = scaleCompoundShape(customShape!, D, cx, cy);
+      return compoundShapeToPathData(scaled, reversed);
+    }
+    const outline = shapeOutline({ sides, diameter: D, dx: D, dy: D * dyScale, cx, cy, sweep: reversed ? 1 : 0 });
+    return outlineToPathData(outline);
+  };
 
   const comments: Record<string, string | number> = {
     "Outer Diameter": outerDiameter,
@@ -98,10 +122,9 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
   const exteriorPaths: CutPath[] = exteriorThetas.map((theta) => {
     const D = exteriorDiameter(theta, outerDiameter);
     const Z = exteriorDepth(theta, { outerDepth, footHeight, zTouchHeight }, footAngle);
-    const outline = shapeOutline({ sides, diameter: D, dx: D, dy: D * outerAspectY, cx, cy, sweep: 0 });
     return {
       id: theta.toFixed(2),
-      d: outlineToPathData(outline),
+      d: ringPathData(D, outerAspectY, false),
       cutType: "outside",
       cutDepthMm: round(Z),
       toolDiaMm: bitSize,
@@ -114,10 +137,9 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
   const interiorPaths: CutPath[] = interiorThetas.map((theta) => {
     const D = interiorDiameter(theta, innerDiameter);
     const Z = interiorDepth(theta, innerDepth, outerDepth, zTouchHeight);
-    const outline = shapeOutline({ sides, diameter: D, dx: D, dy: D * innerAspectY, cx, cy, sweep: 0 });
     return {
       id: theta.toFixed(2),
-      d: outlineToPathData(outline),
+      d: ringPathData(D, innerAspectY, false),
       cutType: "inside",
       cutDepthMm: round(Z),
       toolDiaMm: bitSize,
@@ -129,8 +151,7 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
   // "keep" shape, stepping down from just below the lip to just above the foot.
   // Matches the sample convention: the roughing pocket's outer boundary is the same
   // shape silhouette scaled up to the bounding box size, not a plain rectangle.
-  const stockBoundary = shapeOutline({ sides, diameter: boundingWidth, dx: boundingWidth, dy: boundingHeight, cx, cy, sweep: 0 });
-  const stockBoundaryD = outlineToPathData(stockBoundary);
+  const stockBoundaryD = ringPathData(boundingWidth, boundingHeight / boundingWidth, false);
 
   const exteriorRoughPaths: CutPath[] = [];
   const zTop = exteriorDepth(90, { outerDepth, footHeight, zTouchHeight }, footAngle);
@@ -141,10 +162,9 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
     );
     const D = exteriorDiameter(theta, outerDiameter);
     if (D < minCuttable) continue;
-    const outline = shapeOutline({ sides, diameter: D, dx: D, dy: D * outerAspectY, cx, cy, sweep: 1 });
     exteriorRoughPaths.push({
       id: z.toFixed(2),
-      d: `${stockBoundaryD} ${outlineToPathData(outline)}`,
+      d: `${stockBoundaryD} ${ringPathData(D, outerAspectY, true)}`,
       cutType: "pocket",
       cutDepthMm: round(z),
       toolDiaMm: bitSize,
@@ -158,18 +178,9 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
   const lipWidth = (outerDiameter - innerDiameter) / 2;
   const reliefD = footDiameter - 2 * lipWidth;
   if (reliefD >= minCuttable) {
-    const reliefOutline = shapeOutline({
-      sides,
-      diameter: reliefD,
-      dx: reliefD,
-      dy: reliefD * outerAspectY,
-      cx,
-      cy,
-      sweep: 0,
-    });
     exteriorRoughPaths.push({
       id: "Relief",
-      d: outlineToPathData(reliefOutline),
+      d: ringPathData(reliefD, outerAspectY, false),
       cutType: "pocket",
       cutDepthMm: round(zFoot - 1),
       toolDiaMm: bitSize,
@@ -185,10 +196,9 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
     const theta = solveThetaForDepth(z, 0, 90, (t) => interiorDepth(t, innerDepth, outerDepth, zTouchHeight));
     const D = interiorDiameter(theta, innerDiameter);
     if (D < minCuttable) continue;
-    const outline = shapeOutline({ sides, diameter: D, dx: D, dy: D * innerAspectY, cx, cy, sweep: 0 });
     interiorRoughPaths.push({
       id: z.toFixed(2),
-      d: outlineToPathData(outline),
+      d: ringPathData(D, innerAspectY, false),
       cutType: "pocket",
       cutDepthMm: round(z),
       toolDiaMm: bitSize,

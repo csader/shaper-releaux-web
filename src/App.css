@@ -151,3 +151,63 @@ nav button.active {
   padding: 0.2rem 0.6rem;
   cursor: pointer;
 }
+
+.custom-import {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.6rem;
+  background: #222228;
+  border: 1px solid #3c3c44;
+  border-radius: 6px;
+}
+
+.candidate-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.candidate-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+}
+
+.candidate-id {
+  margin-left: auto;
+  color: #9a9aa2;
+}
+
+.error-note {
+  font-size: 0.78rem;
+  color: #ff6b6b;
+  margin: 0;
+}
+
+.warning-note {
+  font-size: 0.78rem;
+  color: #f5b544;
+  margin: 0;
+}
+
+.scale-preview {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.scale-preview-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  color: #9a9aa2;
+}
+
+.scale-preview-item svg {
+  background: #fff;
+  border-radius: 4px;
+}
