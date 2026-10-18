@@ -275,6 +275,30 @@ header h1 {
   margin: 0;
 }
 
+.readout {
+  background: #222228;
+  border: 1px solid #3c3c44;
+  border-radius: 4px;
+  padding: 0.4rem;
+}
+
+.readout .readout-value {
+  color: #c8c8ce;
+  font-size: 0.9rem;
+}
+
+.readout-warning {
+  border-color: #f5b544;
+}
+
+.readout-warning .readout-value {
+  color: #f5b544;
+}
+
+.readout .warning-note {
+  margin-top: 0.3rem;
+}
+
 .scale-preview {
   display: flex;
   flex-direction: column;

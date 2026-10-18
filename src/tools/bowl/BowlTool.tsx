@@ -61,6 +61,33 @@ function NumberField({
   );
 }
 
+/** Read-only computed value (not a user input) — e.g. floor thickness or lip width,
+ * derived from other fields. Flips to warning styling below `warnIfBelowMm`. */
+function Readout({
+  label,
+  valueMm,
+  unit,
+  warnIfBelowMm,
+  warningText,
+}: {
+  label: string;
+  valueMm: number;
+  unit: Unit;
+  warnIfBelowMm?: number;
+  warningText?: string;
+}) {
+  const isWarning = warnIfBelowMm !== undefined && valueMm < warnIfBelowMm;
+  return (
+    <div className={`field readout ${isWarning ? "readout-warning" : ""}`}>
+      <span>{label}</span>
+      <span className="readout-value">
+        {mmToDisplay(valueMm, unit)} {unitLabel(unit)}
+      </span>
+      {isWarning && warningText && <p className="warning-note">{warningText}</p>}
+    </div>
+  );
+}
+
 function ModelToggle({
   label,
   value,
@@ -92,6 +119,13 @@ export function BowlTool({ unit }: { unit: Unit }) {
 
   const supportsIndependentAxes = shapeSource === "builtin" && (params.sides === 1 || params.sides === 4);
   const isCustom = shapeSource === "upload";
+
+  // Not single-valued around the whole profile (the exterior/interior gap varies
+  // continuously), so these are the two specific points that actually matter: the
+  // lip (nominal, at the corners for non-circular shapes — it narrows slightly
+  // elsewhere, per the readme) and the floor at the bowl's deepest point.
+  const lipWidth = (params.outerDiameter - params.innerDiameter) / 2;
+  const floorThickness = params.outerDepth - params.innerDepth - params.footHeight;
 
   const files = useMemo(() => {
     if (isCustom && !params.customShape) return [];
@@ -219,8 +253,26 @@ export function BowlTool({ unit }: { unit: Unit }) {
             unit={unit}
           />
         )}
+        <Readout
+          label="Lip width (nominal, at corners)"
+          valueMm={lipWidth}
+          unit={unit}
+          warnIfBelowMm={params.bitSize}
+          warningText={`Thinner than the bit (${mmToDisplay(params.bitSize, unit)}${unitLabel(unit)}) — the lip may be too narrow to cut cleanly, or at all.`}
+        />
         <NumberField label="Foot height" valueMm={params.footHeight} onChangeMm={(v) => set("footHeight", v)} unit={unit} />
         <NumberField label="Foot width" valueMm={params.footDiameter} onChangeMm={(v) => set("footDiameter", v)} unit={unit} />
+        <Readout
+          label="Floor thickness"
+          valueMm={floorThickness}
+          unit={unit}
+          warnIfBelowMm={params.bitSize}
+          warningText={
+            floorThickness <= 0
+              ? "Zero or negative — the interior would cut through the bottom of the bowl. Reduce Inner depth or Foot height, or increase Outer depth."
+              : `Thinner than the bit (${mmToDisplay(params.bitSize, unit)}${unitLabel(unit)}) — likely too fragile at the bottom.`
+          }
+        />
         <label className="field checkbox-field">
           <input
             type="checkbox"
