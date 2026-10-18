@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { BowlTool } from "./tools/bowl/BowlTool";
 import { RippleTool } from "./tools/ripple/RippleTool";
+import { BowlIcon } from "./icons/BowlIcon";
+import { WaveIcon } from "./icons/WaveIcon";
 import type { Unit } from "./units";
 import logo from "./assets/logo.svg";
 import "./App.css";
@@ -12,36 +14,51 @@ export default function App() {
   const [unit, setUnit] = useState<Unit>("mm");
 
   return (
-    <div className="app">
-      <header>
-        <div className="brand">
-          <img src={logo} alt="" className="logo" width="36" height="36" />
-          <h1>Reuleaux Web</h1>
+    <div className="app-shell">
+      <nav className="icon-nav">
+        <div className="icon-nav-top">
+          <button
+            className={`icon-nav-button ${tab === "bowl" ? "active" : ""}`}
+            title="Bowl Generator"
+            aria-label="Bowl Generator"
+            onClick={() => setTab("bowl")}
+          >
+            <BowlIcon />
+          </button>
+          <button
+            className={`icon-nav-button ${tab === "ripple" ? "active" : ""}`}
+            title="Wave / Ripple Generator"
+            aria-label="Wave / Ripple Generator"
+            onClick={() => setTab("ripple")}
+          >
+            <WaveIcon />
+          </button>
         </div>
-        <nav>
-          <button className={tab === "bowl" ? "active" : ""} onClick={() => setTab("bowl")}>
-            Bowl Generator
+        <div className="icon-nav-unit-toggle" role="group" aria-label="Units">
+          <button className={unit === "mm" ? "active" : ""} title="Millimeters" onClick={() => setUnit("mm")}>
+            mm
           </button>
-          <button className={tab === "ripple" ? "active" : ""} onClick={() => setTab("ripple")}>
-            Wave / Ripple Generator
+          <button className={unit === "in" ? "active" : ""} title="Inches" onClick={() => setUnit("in")}>
+            in
           </button>
-          <div className="unit-toggle">
-            <button className={unit === "mm" ? "active" : ""} onClick={() => setUnit("mm")}>
-              mm
-            </button>
-            <button className={unit === "in" ? "active" : ""} onClick={() => setUnit("in")}>
-              in
-            </button>
+        </div>
+      </nav>
+
+      <div className="app">
+        <header>
+          <div className="brand">
+            <img src={logo} alt="" className="logo" width="36" height="36" />
+            <h1>Reuleaux Web</h1>
           </div>
-        </nav>
-        {unit === "in" && (
-          <p className="unit-note">
-            Inputs/preview shown in inches for convenience — exported SVG files are always in mm (required by
-            Shaper Origin).
-          </p>
-        )}
-      </header>
-      <main>{tab === "bowl" ? <BowlTool unit={unit} /> : <RippleTool unit={unit} />}</main>
+          {unit === "in" && (
+            <p className="unit-note">
+              Inputs/preview shown in inches for convenience — exported SVG files are always in mm, matching the
+              original Reuleaux app's metric-only convention (Shaper Origin itself supports both).
+            </p>
+          )}
+        </header>
+        <main>{tab === "bowl" ? <BowlTool unit={unit} /> : <RippleTool unit={unit} />}</main>
+      </div>
     </div>
   );
 }

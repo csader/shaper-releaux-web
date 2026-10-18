@@ -17,7 +17,7 @@ Capabilities that don't exist in the original Windows app:
 - **Custom SVG import**: upload your own closed outline — including shapes with holes (e.g. a ring, a letterform) — and it drives the same profile math, roughing, and relief-pocket pipeline as the built-in shapes. Includes a candidate picker, validation (self-intersection, hole containment), and a multi-scale preview so problems are visible before generating
 - **Radial stepping as a selectable alternative** to circumferential, per surface (the original app only ever produces circumferential output)
 - **Foot relief pocket on/off toggle** (the original always includes it when there's room)
-- **mm/in input toggle** (exported files are still always mm — that part matches the original, which is metric-only)
+- **mm/in input toggle** (exported files are still always mm, matching the original's metric-only convention — not a Shaper Origin limitation, its cutDepth encoding supports both units)
 - Live in-browser SVG preview and zip download — the original is a text-prompt CLI tool with no preview, and runs only on Windows
 
 ### Wave / Ripple Generator — new in this version

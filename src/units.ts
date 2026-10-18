@@ -1,6 +1,7 @@
-// All geometry/state is stored in mm internally (matching the original app and
-// Shaper Origin's metric-only expectation — exported files are always mm). This is
-// purely a display/input convenience layer.
+// All geometry/state is stored in mm internally, and exported files are always mm —
+// matching the original Reuleaux app's metric-only convention, not a Shaper Origin
+// requirement (its shaper:cutDepth encoding explicitly supports both mm and in per
+// Shaper's own docs). This file is purely a display/input convenience layer.
 
 export type Unit = "mm" | "in";
 
