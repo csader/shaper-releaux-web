@@ -6,21 +6,23 @@ There's no source available for the original app, so this is a from-scratch reim
 
 ## Features
 
-### Bowl Generator
+### Bowl Generator — reproduces the original Windows app
 
-Generates the same four SVG files (`Exterior`, `ExteriorRoughing`, `Interior`, `InteriorRoughing`) as the original app, encoded with `shaper:cutDepth` / `shaper:toolDia` per [Shaper's manual cut-depth spec](https://support.shapertools.com/hc/en-us/articles/12946815194011-manual-svg-cut-depth-encoding).
+The original Reuleaux.exe generates four SVG files (`Exterior`, `ExteriorRoughing`, `Interior`, `InteriorRoughing`) encoded with `shaper:cutDepth` / `shaper:toolDia` per [Shaper's manual cut-depth spec](https://support.shapertools.com/hc/en-us/articles/12946815194011-manual-svg-cut-depth-encoding), for 7 shapes: circle/ellipse, heart, Reuleaux triangle, square/rectangle, Reuleaux pentagon, hexagon, Reuleaux heptagon (each with independent X/Y where applicable, e.g. ellipses and rectangles) — plus a foot relief pocket in the roughing file when there's room for it, and circumferential finishing-pass stepping. This web version reproduces all of that, validated where real sample output existed to check against (see Testing below) — it's not a reinterpretation, it's meant to produce the same geometry.
 
-- **7 built-in shapes**: circle/ellipse, heart, Reuleaux triangle, square/rectangle, Reuleaux pentagon, hexagon, Reuleaux heptagon
+### Bowl Generator — new in this version
+
+Capabilities that don't exist in the original Windows app:
+
 - **Custom SVG import**: upload your own closed outline — including shapes with holes (e.g. a ring, a letterform) — and it drives the same profile math, roughing, and relief-pocket pipeline as the built-in shapes. Includes a candidate picker, validation (self-intersection, hole containment), and a multi-scale preview so problems are visible before generating
-- Independent X/Y for ellipses and rectangles
-- Radial or circumferential finishing-pass stepping (selectable per surface)
-- Foot relief pocket, toggleable
-- mm/in input toggle (exported files are always mm, per Shaper Origin's requirement)
-- Live SVG preview, per-file or zip download
+- **Radial stepping as a selectable alternative** to circumferential, per surface (the original app only ever produces circumferential output)
+- **Foot relief pocket on/off toggle** (the original always includes it when there's room)
+- **mm/in input toggle** (exported files are still always mm — that part matches the original, which is metric-only)
+- Live in-browser SVG preview and zip download — the original is a text-prompt CLI tool with no preview, and runs only on Windows
 
-### Wave / Ripple Generator
+### Wave / Ripple Generator — new in this version
 
-A second, simpler tool based on the same author's [Wave Effect Surface Treatment](https://hub.shapertools.com/) technique (CC BY-NC-SA 4.0 — noncommercial, attribution, share-alike): parallel furrows, a tileable sine contour, or concentric diminishing rings.
+Not part of Reuleaux.exe at all. The original author documented a related but separate technique, [Wave Effect Surface Treatment](https://hub.shapertools.com/) (CC BY-NC-SA 4.0 — noncommercial, attribution, share-alike) — a manual Inkscape + spreadsheet workflow, not a tool. This turns that technique into an actual generator: parallel furrows, a tileable sine contour, or concentric diminishing rings.
 
 ## Getting started
 
