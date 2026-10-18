@@ -17,7 +17,7 @@ import type { GeneratedFile } from "../../types";
 export interface BowlParams {
   sides: Sides;
   outerDiameter: number;
-  /** Only meaningful for sides=1 (ellipse); n=4 rectangle is a known V1 gap — see plan. */
+  /** Independent Y dimension for sides=1 (ellipse) or sides=4 (rectangle special case). */
   outerDiameterY?: number;
   innerDiameter: number;
   innerDiameterY?: number;
@@ -44,6 +44,7 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
     outerDiameter,
     outerDiameterY,
     innerDiameter,
+    innerDiameterY,
     outerDepth,
     innerDepth,
     footHeight,
@@ -63,6 +64,11 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
   const originX = -bitSize;
   const originY = -bitSize;
   const minCuttable = minCuttableDiameter(bitSize, mmCut);
+  // Independent-axis shapes (ellipse n=1, rectangle n=4) scale the Y extent by this
+  // same ratio at every ring — the single θ-driven profile scale factor applies
+  // uniformly to both axes, just against different base dimensions.
+  const outerAspectY = (outerDiameterY ?? outerDiameter) / outerDiameter;
+  const innerAspectY = (innerDiameterY ?? innerDiameter) / innerDiameter;
 
   const comments: Record<string, string | number> = {
     "Outer Diameter": outerDiameter,
@@ -92,7 +98,7 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
   const exteriorPaths: CutPath[] = exteriorThetas.map((theta) => {
     const D = exteriorDiameter(theta, outerDiameter);
     const Z = exteriorDepth(theta, { outerDepth, footHeight, zTouchHeight }, footAngle);
-    const outline = shapeOutline({ sides, diameter: D, dx: D, dy: D, cx, cy, sweep: 0 });
+    const outline = shapeOutline({ sides, diameter: D, dx: D, dy: D * outerAspectY, cx, cy, sweep: 0 });
     return {
       id: theta.toFixed(2),
       d: outlineToPathData(outline),
@@ -108,7 +114,7 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
   const interiorPaths: CutPath[] = interiorThetas.map((theta) => {
     const D = interiorDiameter(theta, innerDiameter);
     const Z = interiorDepth(theta, innerDepth, outerDepth, zTouchHeight);
-    const outline = shapeOutline({ sides, diameter: D, dx: D, dy: D, cx, cy, sweep: 1 });
+    const outline = shapeOutline({ sides, diameter: D, dx: D, dy: D * innerAspectY, cx, cy, sweep: 0 });
     return {
       id: theta.toFixed(2),
       d: outlineToPathData(outline),
@@ -135,12 +141,37 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
     );
     const D = exteriorDiameter(theta, outerDiameter);
     if (D < minCuttable) continue;
-    const outline = shapeOutline({ sides, diameter: D, dx: D, dy: D, cx, cy, sweep: 1 });
+    const outline = shapeOutline({ sides, diameter: D, dx: D, dy: D * outerAspectY, cx, cy, sweep: 1 });
     exteriorRoughPaths.push({
       id: z.toFixed(2),
       d: `${stockBoundaryD} ${outlineToPathData(outline)}`,
       cutType: "pocket",
       cutDepthMm: round(z),
+      toolDiaMm: bitSize,
+    });
+  }
+
+  // Foot relief pocket: a shallow (1mm) pocket under the foot, included in the
+  // exterior roughing file "only if there is sufficient room". Confirmed against a
+  // real sample (Pear wood 5 sides): diameter = FootDiameter − (OuterDiameter −
+  // InnerDiameter) [i.e. inset by the lip width on each side], depth = zFoot − 1mm.
+  const lipWidth = (outerDiameter - innerDiameter) / 2;
+  const reliefD = footDiameter - 2 * lipWidth;
+  if (reliefD >= minCuttable) {
+    const reliefOutline = shapeOutline({
+      sides,
+      diameter: reliefD,
+      dx: reliefD,
+      dy: reliefD * outerAspectY,
+      cx,
+      cy,
+      sweep: 0,
+    });
+    exteriorRoughPaths.push({
+      id: "Relief",
+      d: outlineToPathData(reliefOutline),
+      cutType: "pocket",
+      cutDepthMm: round(zFoot - 1),
       toolDiaMm: bitSize,
     });
   }
@@ -154,7 +185,7 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
     const theta = solveThetaForDepth(z, 0, 90, (t) => interiorDepth(t, innerDepth, outerDepth, zTouchHeight));
     const D = interiorDiameter(theta, innerDiameter);
     if (D < minCuttable) continue;
-    const outline = shapeOutline({ sides, diameter: D, dx: D, dy: D, cx, cy, sweep: 0 });
+    const outline = shapeOutline({ sides, diameter: D, dx: D, dy: D * innerAspectY, cx, cy, sweep: 0 });
     interiorRoughPaths.push({
       id: z.toFixed(2),
       d: outlineToPathData(outline),

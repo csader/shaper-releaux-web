@@ -35,6 +35,30 @@ nav button.active {
   border-color: #4a6cf7;
 }
 
+.unit-toggle {
+  display: inline-flex;
+  margin-left: 0.5rem;
+}
+
+.unit-toggle button {
+  margin-right: 0;
+  border-radius: 0;
+}
+
+.unit-toggle button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.unit-toggle button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+.unit-note {
+  font-size: 0.78rem;
+  color: #9a9aa2;
+  margin: 0.5rem 0 0;
+}
+
 .tool {
   display: grid;
   grid-template-columns: 280px 1fr;
@@ -64,9 +88,16 @@ nav button.active {
   border-radius: 4px;
 }
 
-.license-note {
+.license-note,
+.hint-note {
   font-size: 0.75rem;
   color: #9a9aa2;
+}
+
+.checkbox-field {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .preview-pair {

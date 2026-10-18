@@ -6,6 +6,7 @@
 import type { ArcSegment, PolygonOutline } from "./reuleauxPolygon";
 import { reuleauxPolygonOutline } from "./reuleauxPolygon";
 import { heartOutline } from "./heart";
+import { rectangleOutline } from "./rectangle";
 
 export type Sides = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
@@ -38,8 +39,12 @@ export function shapeOutline(opts: ShapeOutlineOptions): PolygonOutline {
       return ellipseOutline(opts.dx ?? diameter, opts.dy ?? diameter, cx, cy, sweep);
     case 2:
       return heartOutline(diameter, cx, cy, sweep);
-    case 3:
     case 4:
+      if (opts.dx !== undefined && opts.dy !== undefined && Math.abs(opts.dx - opts.dy) > 1e-9) {
+        return rectangleOutline(opts.dx, opts.dy, cx, cy, sweep === 1);
+      }
+      return reuleauxPolygonOutline(4, diameter, cx, cy, sweep);
+    case 3:
     case 5:
     case 6:
     case 7:

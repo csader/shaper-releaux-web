@@ -3,12 +3,13 @@ import { generateBowl, type BowlParams } from "./generate";
 import type { Sides } from "../../geometry/shapes";
 import type { SteppingModel } from "../../geometry/profile";
 import { downloadAllAsZip, downloadFile } from "../../download/download";
+import { displayToMm, mmToDisplay, unitLabel, type Unit } from "../../units";
 
 const SIDE_LABELS: Record<Sides, string> = {
   1: "1 — Circle / Ellipse",
   2: "2 — Heart",
   3: "3 — Reuleaux triangle",
-  4: "4 — Square",
+  4: "4 — Square / Rectangle",
   5: "5 — Reuleaux pentagon",
   6: "6 — Hexagon",
   7: "7 — Reuleaux heptagon",
@@ -31,19 +32,28 @@ const DEFAULTS: BowlParams = {
 
 function NumberField({
   label,
-  value,
-  onChange,
+  valueMm,
+  onChangeMm,
+  unit,
   step = 1,
 }: {
   label: string;
-  value: number;
-  onChange: (v: number) => void;
+  valueMm: number;
+  onChangeMm: (mm: number) => void;
+  unit: Unit;
   step?: number;
 }) {
   return (
     <label className="field">
-      <span>{label}</span>
-      <input type="number" step={step} value={value} onChange={(e) => onChange(parseFloat(e.target.value) || 0)} />
+      <span>
+        {label} ({unitLabel(unit)})
+      </span>
+      <input
+        type="number"
+        step={step}
+        value={mmToDisplay(valueMm, unit)}
+        onChange={(e) => onChangeMm(displayToMm(parseFloat(e.target.value) || 0, unit))}
+      />
     </label>
   );
 }
@@ -68,10 +78,13 @@ function ModelToggle({
   );
 }
 
-export function BowlTool() {
+export function BowlTool({ unit }: { unit: Unit }) {
   const [params, setParams] = useState<BowlParams>(DEFAULTS);
+  const [independentAxes, setIndependentAxes] = useState(false);
   const set = <K extends keyof BowlParams>(key: K, value: BowlParams[K]) =>
     setParams((p) => ({ ...p, [key]: value }));
+
+  const supportsIndependentAxes = params.sides === 1 || params.sides === 4;
 
   const files = useMemo(() => {
     try {
@@ -90,7 +103,14 @@ export function BowlTool() {
       <div className="form">
         <label className="field">
           <span>Number of sides</span>
-          <select value={params.sides} onChange={(e) => set("sides", Number(e.target.value) as Sides)}>
+          <select
+            value={params.sides}
+            onChange={(e) => {
+              const sides = Number(e.target.value) as Sides;
+              set("sides", sides);
+              if (sides !== 1 && sides !== 4) setIndependentAxes(false);
+            }}
+          >
             {Object.entries(SIDE_LABELS).map(([n, label]) => (
               <option key={n} value={n}>
                 {label}
@@ -98,17 +118,54 @@ export function BowlTool() {
             ))}
           </select>
         </label>
-        <NumberField label="Outer diameter (mm)" value={params.outerDiameter} onChange={(v) => set("outerDiameter", v)} />
-        <NumberField label="Inner diameter (mm)" value={params.innerDiameter} onChange={(v) => set("innerDiameter", v)} />
-        <NumberField label="Outer depth (mm)" value={params.outerDepth} onChange={(v) => set("outerDepth", v)} />
-        <NumberField label="Inner depth (mm)" value={params.innerDepth} onChange={(v) => set("innerDepth", v)} />
-        <NumberField label="Foot height (mm)" value={params.footHeight} onChange={(v) => set("footHeight", v)} />
-        <NumberField label="Foot diameter (mm)" value={params.footDiameter} onChange={(v) => set("footDiameter", v)} />
-        <NumberField label="Z-touch height (mm)" value={params.zTouchHeight} onChange={(v) => set("zTouchHeight", v)} />
-        <NumberField label="Bit size (mm)" value={params.bitSize} onChange={(v) => set("bitSize", v)} step={0.5} />
-        <NumberField label="MM cut (width of cut paths)" value={params.mmCut} onChange={(v) => set("mmCut", v)} step={0.1} />
+
+        {supportsIndependentAxes && (
+          <label className="field checkbox-field">
+            <input
+              type="checkbox"
+              checked={independentAxes}
+              onChange={(e) => {
+                setIndependentAxes(e.target.checked);
+                if (!e.target.checked) {
+                  set("outerDiameterY", undefined);
+                  set("innerDiameterY", undefined);
+                }
+              }}
+            />
+            <span>{params.sides === 1 ? "Independent X/Y (ellipse)" : "Independent X/Y (rectangle)"}</span>
+          </label>
+        )}
+
+        <NumberField label="Outer diameter" valueMm={params.outerDiameter} onChangeMm={(v) => set("outerDiameter", v)} unit={unit} />
+        {independentAxes && (
+          <NumberField
+            label="Outer diameter Y"
+            valueMm={params.outerDiameterY ?? params.outerDiameter}
+            onChangeMm={(v) => set("outerDiameterY", v)}
+            unit={unit}
+          />
+        )}
+        <NumberField label="Inner diameter" valueMm={params.innerDiameter} onChangeMm={(v) => set("innerDiameter", v)} unit={unit} />
+        {independentAxes && (
+          <NumberField
+            label="Inner diameter Y"
+            valueMm={params.innerDiameterY ?? params.innerDiameter}
+            onChangeMm={(v) => set("innerDiameterY", v)}
+            unit={unit}
+          />
+        )}
+        <NumberField label="Outer depth" valueMm={params.outerDepth} onChangeMm={(v) => set("outerDepth", v)} unit={unit} />
+        <NumberField label="Inner depth" valueMm={params.innerDepth} onChangeMm={(v) => set("innerDepth", v)} unit={unit} />
+        <NumberField label="Foot height" valueMm={params.footHeight} onChangeMm={(v) => set("footHeight", v)} unit={unit} />
+        <NumberField label="Foot diameter" valueMm={params.footDiameter} onChangeMm={(v) => set("footDiameter", v)} unit={unit} />
+        <NumberField label="Z-touch height" valueMm={params.zTouchHeight} onChangeMm={(v) => set("zTouchHeight", v)} unit={unit} />
+        <NumberField label="Bit size" valueMm={params.bitSize} onChangeMm={(v) => set("bitSize", v)} unit={unit} step={0.5} />
+        <NumberField label="MM cut (width of cut paths)" valueMm={params.mmCut} onChangeMm={(v) => set("mmCut", v)} unit={unit} step={0.1} />
         <ModelToggle label="Interior finishing model" value={params.interiorModel} onChange={(v) => set("interiorModel", v)} />
         <ModelToggle label="Exterior finishing model" value={params.exteriorModel} onChange={(v) => set("exteriorModel", v)} />
+        <p className="hint-note">
+          A foot relief pocket is included automatically in the roughing file when there's room for it.
+        </p>
       </div>
 
       <div className="preview">
