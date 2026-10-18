@@ -1,11 +1,12 @@
-import { useMemo, useState } from "react";
-import { generateBowl, type BowlParams } from "./generate";
+import { useMemo, useRef, useState } from "react";
+import { generateBowl, boundingBoxFor, type BowlParams } from "./generate";
 import { CustomShapeImport } from "./CustomShapeImport";
 import type { Sides } from "../../geometry/shapes";
 import type { SteppingModel } from "../../geometry/profile";
 import { downloadAllAsZip, downloadFile } from "../../download/download";
 import { displayToMm, mmToDisplay, unitLabel, type Unit } from "../../units";
 import { shadePreviewSvg } from "../../svg/previewShading";
+import { resolveAnchorPoint, type AnchorConfig, type AnchorPosition, type BoundingBox } from "../../svg/anchor";
 
 const SIDE_LABELS: Record<Sides, string> = {
   1: "1 — Circle / Ellipse",
@@ -16,6 +17,30 @@ const SIDE_LABELS: Record<Sides, string> = {
   6: "6 — Hexagon",
   7: "7 — Reuleaux heptagon",
 };
+
+const BIT_PRESETS: { label: string; mm: number }[] = [
+  { label: '1/8"', mm: 0.125 * 25.4 },
+  { label: '1/4"', mm: 0.25 * 25.4 },
+  { label: '1/2"', mm: 0.5 * 25.4 },
+  { label: "3mm", mm: 3 },
+  { label: "6mm", mm: 6 },
+  { label: "8mm", mm: 8 },
+  { label: "16mm", mm: 16 },
+];
+
+const ANCHOR_GRID: { position: AnchorPosition; label: string }[] = [
+  { position: "top-left", label: "Top left" },
+  { position: "top-center", label: "Top center" },
+  { position: "top-right", label: "Top right" },
+  { position: "middle-left", label: "Middle left" },
+  { position: "center", label: "Center" },
+  { position: "middle-right", label: "Middle right" },
+  { position: "bottom-left", label: "Bottom left" },
+  { position: "bottom-center", label: "Bottom center" },
+  { position: "bottom-right", label: "Bottom right" },
+];
+
+const DEFAULT_ANCHOR: AnchorConfig = { enabled: false, position: "center" };
 
 const DEFAULTS: BowlParams = {
   sides: 5,
@@ -108,6 +133,48 @@ function ModelToggle({
   );
 }
 
+/** Draggable (only in "custom" position mode) marker shown over the exterior preview,
+ * aligned to the same viewBox coordinates as the generated files so where you drop it
+ * is where the real anchor marker lands. */
+function AnchorOverlay({
+  box,
+  point,
+  draggable,
+  onDrag,
+}: {
+  box: BoundingBox;
+  point: { x: number; y: number };
+  draggable: boolean;
+  onDrag: (xMm: number, yMm: number) => void;
+}) {
+  const ref = useRef<SVGSVGElement>(null);
+  const handlePointer = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (!draggable || !ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const nx = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    const ny = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+    onDrag(box.originX + nx * box.width, box.originY + ny * box.height);
+  };
+  const r = Math.max(box.width, box.height) * 0.02;
+  return (
+    <svg
+      ref={ref}
+      className={`anchor-overlay ${draggable ? "draggable" : ""}`}
+      viewBox={`${box.originX} ${box.originY} ${box.width} ${box.height}`}
+      onPointerDown={(e) => {
+        if (!draggable) return;
+        ref.current?.setPointerCapture(e.pointerId);
+        handlePointer(e);
+      }}
+      onPointerMove={(e) => {
+        if (draggable && e.buttons === 1) handlePointer(e);
+      }}
+    >
+      <circle cx={point.x} cy={point.y} r={r} fill="#ff0000" stroke="#ffffff" strokeWidth={r * 0.2} />
+    </svg>
+  );
+}
+
 type ShapeSource = "upload" | "builtin";
 
 export function BowlTool({ unit }: { unit: Unit }) {
@@ -126,6 +193,9 @@ export function BowlTool({ unit }: { unit: Unit }) {
   // elsewhere, per the readme) and the floor at the bowl's deepest point.
   const lipWidth = (params.outerDiameter - params.innerDiameter) / 2;
   const floorThickness = params.outerDepth - params.innerDepth - params.footHeight;
+
+  const boundingBox = boundingBoxFor(params);
+  const anchorPreviewPoint = params.anchor?.enabled ? resolveAnchorPoint(params.anchor, boundingBox) : null;
 
   const files = useMemo(() => {
     if (isCustom && !params.customShape) return [];
@@ -235,6 +305,18 @@ export function BowlTool({ unit }: { unit: Unit }) {
         <NumberField label="Outer depth" valueMm={params.outerDepth} onChangeMm={(v) => set("outerDepth", v)} unit={unit} />
         <NumberField label="Inner depth" valueMm={params.innerDepth} onChangeMm={(v) => set("innerDepth", v)} unit={unit} />
         <NumberField label="Bit size" valueMm={params.bitSize} onChangeMm={(v) => set("bitSize", v)} unit={unit} step={0.5} />
+        <div className="bit-presets">
+          {BIT_PRESETS.map((p) => (
+            <button
+              key={p.label}
+              type="button"
+              className={Math.abs(params.bitSize - p.mm) < 1e-3 ? "active" : ""}
+              onClick={() => set("bitSize", p.mm)}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
         <NumberField label="Outer width" valueMm={params.outerDiameter} onChangeMm={(v) => set("outerDiameter", v)} unit={unit} />
         {independentAxes && (
           <NumberField
@@ -288,6 +370,65 @@ export function BowlTool({ unit }: { unit: Unit }) {
             A foot relief pocket is included automatically in the roughing file when there's room for it.
           </p>
         )}
+
+        <label className="field checkbox-field">
+          <input
+            type="checkbox"
+            checked={params.anchor?.enabled ?? false}
+            onChange={(e) => set("anchor", { ...(params.anchor ?? DEFAULT_ANCHOR), enabled: e.target.checked })}
+          />
+          <span>Add a custom anchor marker (Shaper Origin registration point)</span>
+        </label>
+
+        {params.anchor?.enabled && (
+          <div className="anchor-picker">
+            <div className="anchor-grid">
+              {ANCHOR_GRID.map((cell) => (
+                <button
+                  key={cell.position}
+                  type="button"
+                  title={cell.label}
+                  className={params.anchor?.position === cell.position ? "active" : ""}
+                  onClick={() => set("anchor", { ...params.anchor!, position: cell.position })}
+                >
+                  <span className="anchor-dot" />
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className={`anchor-custom-btn ${params.anchor?.position === "custom" ? "active" : ""}`}
+              onClick={() => {
+                const current = resolveAnchorPoint({ ...params.anchor!, position: "center" }, boundingBox);
+                set("anchor", {
+                  ...params.anchor!,
+                  position: "custom",
+                  customX: params.anchor?.customX ?? current!.x,
+                  customY: params.anchor?.customY ?? current!.y,
+                });
+              }}
+            >
+              Custom position
+            </button>
+            {params.anchor?.position === "custom" && (
+              <>
+                <NumberField
+                  label="Anchor X"
+                  valueMm={params.anchor.customX ?? 0}
+                  onChangeMm={(v) => set("anchor", { ...params.anchor!, customX: v })}
+                  unit={unit}
+                />
+                <NumberField
+                  label="Anchor Y"
+                  valueMm={params.anchor.customY ?? 0}
+                  onChangeMm={(v) => set("anchor", { ...params.anchor!, customY: v })}
+                  unit={unit}
+                />
+                <p className="hint-note">Or drag the red marker in the exterior preview below.</p>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="preview">
@@ -295,7 +436,17 @@ export function BowlTool({ unit }: { unit: Unit }) {
           {exteriorPreview && (
             <div>
               <h3>Exterior</h3>
-              <div className="svg-box" dangerouslySetInnerHTML={{ __html: exteriorPreviewHtml }} />
+              <div className="svg-box-wrap">
+                <div className="svg-box" dangerouslySetInnerHTML={{ __html: exteriorPreviewHtml }} />
+                {anchorPreviewPoint && (
+                  <AnchorOverlay
+                    box={boundingBox}
+                    point={anchorPreviewPoint}
+                    draggable={params.anchor?.position === "custom"}
+                    onDrag={(x, y) => set("anchor", { ...params.anchor!, customX: x, customY: y })}
+                  />
+                )}
+              </div>
             </div>
           )}
           {interiorPreview && (

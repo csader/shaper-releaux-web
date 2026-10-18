@@ -15,6 +15,7 @@ import { buildShaperSvg, type CutPath } from "../../svg/shaperSvg";
 import { splitIntoChunks } from "../../svg/fileSplit";
 import type { GeneratedFile } from "../../types";
 import { compoundShapeToPathData, scaleCompoundShape, type CompoundShape } from "../../geometry/customShape";
+import { anchorTrianglePathData, resolveAnchorPoint, type AnchorConfig, type BoundingBox } from "../../svg/anchor";
 
 export interface BowlParams {
   sides: Sides | "custom";
@@ -37,12 +38,26 @@ export interface BowlParams {
   /** Whether to include the foot relief pocket in the roughing file, when there's
    * room for it. Defaults to true (matching the original app's always-on behavior). */
   footRelief?: boolean;
+  /** Optional Shaper Origin custom anchor marker, placed identically in every
+   * generated file (they all share the same bounding box / coordinate space). */
+  anchor?: AnchorConfig;
 }
 
 const ROUGH_Z_STEP = 4; // mm, per the vertical model used for all roughing passes
 
 function minCuttableDiameter(bitSize: number, mmCut: number): number {
   return bitSize + 2 * mmCut;
+}
+
+/** The bounding box every generated file for one set of params shares — exposed so
+ * the UI can align an anchor-marker preview/drag overlay to the same coordinates. */
+export function boundingBoxFor(params: Pick<BowlParams, "outerDiameter" | "outerDiameterY" | "bitSize">): BoundingBox {
+  return {
+    width: params.outerDiameter + 2 * params.bitSize,
+    height: (params.outerDiameterY ?? params.outerDiameter) + 2 * params.bitSize,
+    originX: -params.bitSize,
+    originY: -params.bitSize,
+  };
 }
 
 export function generateBowl(params: BowlParams): GeneratedFile[] {
@@ -63,6 +78,7 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
     interiorModel,
     exteriorModel,
     footRelief = true,
+    anchor,
   } = params;
 
   if (sides === "custom" && !customShape) {
@@ -70,8 +86,9 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
   }
 
   const footAngle = footAngleDeg(outerDiameter, footDiameter);
-  const boundingWidth = outerDiameter + 2 * bitSize;
-  const boundingHeight = (outerDiameterY ?? outerDiameter) + 2 * bitSize;
+  const box = boundingBoxFor(params);
+  const boundingWidth = box.width;
+  const boundingHeight = box.height;
   const cx = outerDiameter / 2;
   // Odd-n true Reuleaux shapes (3, 5, 7) aren't symmetric around their own vertex
   // circumcenter — the single pointed vertex sticks out farther than the curved side
@@ -85,8 +102,8 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
   if (sides === 3 || sides === 5 || sides === 7) {
     cy -= oddCircumradius(sides, outerDiameter) - outerDiameter / 2;
   }
-  const originX = -bitSize;
-  const originY = -bitSize;
+  const originX = box.originX;
+  const originY = box.originY;
   const minCuttable = minCuttableDiameter(bitSize, mmCut);
   // Independent-axis shapes (ellipse n=1, rectangle n=4) scale the Y extent by this
   // same ratio at every ring — the single θ-driven profile scale factor applies
@@ -222,6 +239,12 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
   }
 
   // --- Assemble files, splitting long finishing-pass lists --------------
+  // Every file for this run shares the same bounding box, so one anchor point (if
+  // enabled) lands at the identical physical spot in each — the same registration
+  // mark works across all four passes without re-measuring.
+  const anchorPoint = anchor ? resolveAnchorPoint(anchor, box) : null;
+  const anchorPathData = anchorPoint ? anchorTrianglePathData(anchorPoint.x, anchorPoint.y, anchor!.position) : undefined;
+
   const files: GeneratedFile[] = [];
   const addSplit = (basename: string, paths: CutPath[]) => {
     const chunks = splitIntoChunks(paths);
@@ -235,6 +258,7 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
           boundingHeightMm: boundingHeight,
           originX,
           originY,
+          anchorPathData,
           paths: chunk,
           comments,
           docName: name,

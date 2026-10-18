@@ -15,7 +15,11 @@ export function shadePreviewSvg(svgContent: string): string {
   const g = doc.querySelector("g");
   if (!g) return svgContent;
 
-  const paths = Array.from(g.querySelectorAll("path"));
+  // The anchor marker (if present) is a registration point, not a cut ring — leave
+  // its own red styling alone and keep it on top rather than folding it into the
+  // shading cycle below.
+  const anchor = g.querySelector("#anchor-marker");
+  const paths = Array.from(g.querySelectorAll("path")).filter((p) => p !== anchor);
   const n = paths.length;
   if (n === 0) return svgContent;
 
@@ -31,6 +35,8 @@ export function shadePreviewSvg(svgContent: string): string {
       `fill:rgb(${shade},${shade},${shade}) !important;stroke:none !important;opacity:1 !important`,
     );
   });
+
+  if (anchor) g.appendChild(anchor);
 
   return new XMLSerializer().serializeToString(doc);
 }
