@@ -36,6 +36,18 @@ describe("resolveAnchorPoint", () => {
     const anchor: AnchorConfig = { enabled: true, position: "custom" };
     expect(resolveAnchorPoint(anchor, box)).toEqual({ x: 40, y: 20 });
   });
+
+  it("uses trueCenter (not the box midpoint) for every position that references the midline", () => {
+    // Odd-n Reuleaux shapes aren't centered in their own declared bounding box — this
+    // is what makes "center" (and the other midline positions) land on the shape
+    // instead of an arbitrary offset point. See shapeCenterFor in tools/bowl/generate.ts.
+    const trueCenter = { x: 37, y: 15 };
+    expect(resolveAnchorPoint({ enabled: true, position: "center" }, box, trueCenter)).toEqual(trueCenter);
+    expect(resolveAnchorPoint({ enabled: true, position: "top-center" }, box, trueCenter)).toEqual({ x: 37, y: -10 });
+    expect(resolveAnchorPoint({ enabled: true, position: "middle-left" }, box, trueCenter)).toEqual({ x: -10, y: 15 });
+    // Corners are untouched by trueCenter — they're defined by the box edges, not the midline.
+    expect(resolveAnchorPoint({ enabled: true, position: "top-left" }, box, trueCenter)).toEqual({ x: -10, y: -10 });
+  });
 });
 
 describe("anchorTrianglePathData", () => {

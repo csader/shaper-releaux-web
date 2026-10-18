@@ -52,14 +52,25 @@ export const ANCHOR_DIRECTION: Record<AnchorPosition, { sx: 1 | -1; sy: 1 | -1 }
   custom: { sx: 1, sy: 1 },
 };
 
-export function resolveAnchorPoint(anchor: AnchorConfig, box: BoundingBox): { x: number; y: number } | null {
+/**
+ * `trueCenter`, if given, is used for position="center" instead of the bounding
+ * box's own midpoint — they can differ (e.g. odd-n Reuleaux shapes aren't centered
+ * in their own declared bounding box; see shapeCenterFor in tools/bowl/generate.ts).
+ * Falls back to the box midpoint when omitted, so other callers (and "custom" with
+ * no coordinates set yet) still get a sensible default.
+ */
+export function resolveAnchorPoint(
+  anchor: AnchorConfig,
+  box: BoundingBox,
+  trueCenter?: { x: number; y: number },
+): { x: number; y: number } | null {
   if (!anchor.enabled) return null;
   const left = box.originX;
   const right = box.originX + box.width;
   const top = box.originY;
   const bottom = box.originY + box.height;
-  const midX = box.originX + box.width / 2;
-  const midY = box.originY + box.height / 2;
+  const midX = trueCenter?.x ?? box.originX + box.width / 2;
+  const midY = trueCenter?.y ?? box.originY + box.height / 2;
   switch (anchor.position) {
     case "top-left":
       return { x: left, y: top };

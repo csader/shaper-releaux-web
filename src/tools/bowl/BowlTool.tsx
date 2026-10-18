@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { generateBowl, boundingBoxFor, type BowlParams } from "./generate";
+import { generateBowl, boundingBoxFor, shapeCenterFor, type BowlParams } from "./generate";
 import { CustomShapeImport } from "./CustomShapeImport";
 import type { Sides } from "../../geometry/shapes";
 import type { SteppingModel } from "../../geometry/profile";
@@ -223,7 +223,10 @@ export function BowlTool({ unit }: { unit: Unit }) {
   const floorThickness = params.outerDepth - params.innerDepth - params.footHeight;
 
   const boundingBox = boundingBoxFor(params);
-  const anchorPreviewPoint = params.anchor?.enabled ? resolveAnchorPoint(params.anchor, boundingBox) : null;
+  const shapeCenter = shapeCenterFor(params);
+  const anchorPreviewPoint = params.anchor?.enabled
+    ? resolveAnchorPoint(params.anchor, boundingBox, { x: shapeCenter.cx, y: shapeCenter.cy })
+    : null;
 
   const files = useMemo(() => {
     if (isCustom && !params.customShape) return [];
@@ -445,7 +448,11 @@ export function BowlTool({ unit }: { unit: Unit }) {
               type="button"
               className={`anchor-custom-btn ${params.anchor?.position === "custom" ? "active" : ""}`}
               onClick={() => {
-                const current = resolveAnchorPoint({ ...params.anchor!, position: "center" }, boundingBox);
+                const current = resolveAnchorPoint(
+                  { ...params.anchor!, position: "center" },
+                  boundingBox,
+                  { x: shapeCenter.cx, y: shapeCenter.cy },
+                );
                 set("anchor", {
                   ...params.anchor!,
                   position: "custom",

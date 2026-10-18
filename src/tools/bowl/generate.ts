@@ -67,6 +67,22 @@ export function boundingBoxFor(params: Pick<BowlParams, "outerDiameter" | "outer
   };
 }
 
+/** The actual center every ring is scaled toward — exposed so the UI's "center"
+ * anchor position lands on the shape's real center, not the bounding box's naive
+ * midpoint (they differ for odd-n Reuleaux shapes; see the comment where this is
+ * used in generateBowl). */
+export function shapeCenterFor(params: Pick<BowlParams, "sides" | "outerDiameter" | "outerDiameterY">): {
+  cx: number;
+  cy: number;
+} {
+  const cx = params.outerDiameter / 2;
+  let cy = (params.outerDiameterY ?? params.outerDiameter) / 2;
+  if (params.sides === 3 || params.sides === 5 || params.sides === 7) {
+    cy -= oddCircumradius(params.sides, params.outerDiameter) - params.outerDiameter / 2;
+  }
+  return { cx, cy };
+}
+
 export function generateBowl(params: BowlParams): GeneratedFile[] {
   const {
     sides,
@@ -98,7 +114,6 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
   const box = boundingBoxFor(params);
   const boundingWidth = box.width;
   const boundingHeight = box.height;
-  const cx = outerDiameter / 2;
   // Odd-n true Reuleaux shapes (3, 5, 7) aren't symmetric around their own vertex
   // circumcenter — the single pointed vertex sticks out farther than the curved side
   // opposite it (confirmed against both the readme's own worked example and the real
@@ -107,10 +122,7 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
   // by far the largest offset (~7.7% of D, vs ~2.6% for pentagon, ~1.3% for heptagon).
   // All rings share this one fixed centre (uniform scale toward one point), so the
   // offset only needs computing once, from the outer diameter.
-  let cy = (outerDiameterY ?? outerDiameter) / 2;
-  if (sides === 3 || sides === 5 || sides === 7) {
-    cy -= oddCircumradius(sides, outerDiameter) - outerDiameter / 2;
-  }
+  const { cx, cy } = shapeCenterFor(params);
   const originX = box.originX;
   const originY = box.originY;
   const minCuttable = minCuttableDiameter(bitSize, mmCut);
@@ -251,7 +263,7 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
   // Every file for this run shares the same bounding box, so one anchor point (if
   // enabled) lands at the identical physical spot in each — the same registration
   // mark works across all four passes without re-measuring.
-  const anchorPoint = anchor ? resolveAnchorPoint(anchor, box) : null;
+  const anchorPoint = anchor ? resolveAnchorPoint(anchor, box, { x: cx, y: cy }) : null;
   const anchorPathData = anchorPoint ? anchorTrianglePathData(anchorPoint.x, anchorPoint.y, anchor!.position) : undefined;
 
   const files: GeneratedFile[] = [];
