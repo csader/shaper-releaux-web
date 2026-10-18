@@ -161,45 +161,31 @@ function ModelToggle({
   );
 }
 
-/** Draggable (only in "custom" position mode) marker shown over the exterior preview,
- * aligned to the same viewBox coordinates as the generated files so where you drop it
- * is where the real anchor marker lands. */
-function AnchorOverlay({
-  box,
-  point,
-  draggable,
-  onDrag,
-}: {
-  box: BoundingBox;
-  point: { x: number; y: number };
-  draggable: boolean;
-  onDrag: (xMm: number, yMm: number) => void;
-}) {
+/** Invisible drag hit-area over the exterior preview, active only in "custom"
+ * position mode. No visual of its own — the real anchor marker (the red triangle
+ * already baked into the previewed SVG, kept on top by shadePreviewSvg) is what's
+ * visible; this just translates pointer drags on top of it into mm coordinates. */
+function AnchorOverlay({ box, onDrag }: { box: BoundingBox; onDrag: (xMm: number, yMm: number) => void }) {
   const ref = useRef<SVGSVGElement>(null);
   const handlePointer = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (!draggable || !ref.current) return;
+    if (!ref.current) return;
     const rect = ref.current.getBoundingClientRect();
     const nx = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
     const ny = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
     onDrag(box.originX + nx * box.width, box.originY + ny * box.height);
   };
-  const r = Math.max(box.width, box.height) * 0.02;
   return (
     <svg
       ref={ref}
-      className={`anchor-overlay ${draggable ? "draggable" : ""}`}
-      viewBox={`${box.originX} ${box.originY} ${box.width} ${box.height}`}
+      className="anchor-overlay"
       onPointerDown={(e) => {
-        if (!draggable) return;
         ref.current?.setPointerCapture(e.pointerId);
         handlePointer(e);
       }}
       onPointerMove={(e) => {
-        if (draggable && e.buttons === 1) handlePointer(e);
+        if (e.buttons === 1) handlePointer(e);
       }}
-    >
-      <circle cx={point.x} cy={point.y} r={r} fill="#ff0000" stroke="#ffffff" strokeWidth={r * 0.2} />
-    </svg>
+    />
   );
 }
 
@@ -491,11 +477,9 @@ export function BowlTool({ unit }: { unit: Unit }) {
               <h3>Exterior</h3>
               <div className="svg-box-wrap">
                 <div className="svg-box" dangerouslySetInnerHTML={{ __html: exteriorPreviewHtml }} />
-                {anchorPreviewPoint && (
+                {anchorPreviewPoint && params.anchor?.position === "custom" && (
                   <AnchorOverlay
                     box={boundingBox}
-                    point={anchorPreviewPoint}
-                    draggable={params.anchor?.position === "custom"}
                     onDrag={(x, y) => set("anchor", { ...params.anchor!, customX: x, customY: y })}
                   />
                 )}
