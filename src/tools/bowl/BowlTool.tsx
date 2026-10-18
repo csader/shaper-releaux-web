@@ -374,6 +374,15 @@ export function BowlTool({ unit }: { unit: Unit }) {
         <label className="field checkbox-field">
           <input
             type="checkbox"
+            checked={params.includeBoundingBox ?? false}
+            onChange={(e) => set("includeBoundingBox", e.target.checked)}
+          />
+          <span>Include bounding-box guide rectangle (matches the original app)</span>
+        </label>
+
+        <label className="field checkbox-field">
+          <input
+            type="checkbox"
             checked={params.anchor?.enabled ?? false}
             onChange={(e) => set("anchor", { ...(params.anchor ?? DEFAULT_ANCHOR), enabled: e.target.checked })}
           />

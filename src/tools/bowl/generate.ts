@@ -41,6 +41,9 @@ export interface BowlParams {
   /** Optional Shaper Origin custom anchor marker, placed identically in every
    * generated file (they all share the same bounding box / coordinate space). */
   anchor?: AnchorConfig;
+  /** The original app always includes a blue bounding-box guide rect in every file.
+   * Off by default here; on for original-app fidelity. */
+  includeBoundingBox?: boolean;
 }
 
 const ROUGH_Z_STEP = 4; // mm, per the vertical model used for all roughing passes
@@ -79,6 +82,7 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
     exteriorModel,
     footRelief = true,
     anchor,
+    includeBoundingBox = false,
   } = params;
 
   if (sides === "custom" && !customShape) {
@@ -259,6 +263,7 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
           originX,
           originY,
           anchorPathData,
+          includeBoundingBox,
           paths: chunk,
           comments,
           docName: name,

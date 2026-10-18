@@ -25,6 +25,9 @@ export interface ShaperSvgOptions {
   docName: string;
   /** `d` string for a Shaper Origin custom anchor marker (see svg/anchor.ts), if enabled. */
   anchorPathData?: string;
+  /** The original app always includes a blue, zero-width-stroke guide rect spanning
+   * the bounding box. Off by default here; on for original-app fidelity. */
+  includeBoundingBox?: boolean;
 }
 
 const STYLE_BY_CUT_TYPE: Record<CutType, string> = {
@@ -40,11 +43,26 @@ function escapeXml(s: string): string {
 }
 
 export function buildShaperSvg(opts: ShaperSvgOptions): string {
-  const { boundingWidthMm, boundingHeightMm, originX, originY, paths, comments, docName, anchorPathData } = opts;
+  const {
+    boundingWidthMm,
+    boundingHeightMm,
+    originX,
+    originY,
+    paths,
+    comments,
+    docName,
+    anchorPathData,
+    includeBoundingBox,
+  } = opts;
 
   const commentLines = Object.entries(comments)
     .map(([k, v]) => `<!-- ${escapeXml(k)} = ${escapeXml(String(v))} -->`)
     .join("\n");
+
+  const boundingBoxElement = includeBoundingBox
+    ? `    <rect id="boundingbox" style="fill:none;stroke:#0000ff;stroke-width:0;stroke-dasharray:none"
+       width="${boundingWidthMm}" height="${boundingHeightMm}" x="${originX}" y="${originY}" />\n`
+    : "";
 
   const pathElements = paths
     .map((p) => {
@@ -73,7 +91,7 @@ ${commentLines}
    xmlns:svg="http://www.w3.org/2000/svg"
    xmlns:shaper="http://www.shapertools.com/namespaces/shaper">
   <g id="layer1">
-${pathElements}${anchorElement}
+${boundingBoxElement}${pathElements}${anchorElement}
   </g>
 </svg>
 `;
