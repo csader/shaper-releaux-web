@@ -2,6 +2,7 @@ import { useState } from "react";
 import { BowlTool } from "./tools/bowl/BowlTool";
 import { RippleTool } from "./tools/ripple/RippleTool";
 import type { Unit } from "./units";
+import logo from "./assets/logo.svg";
 import "./App.css";
 
 type Tab = "bowl" | "ripple";
@@ -13,7 +14,10 @@ export default function App() {
   return (
     <div className="app">
       <header>
-        <h1>Reuleaux Web</h1>
+        <div className="brand">
+          <img src={logo} alt="" className="logo" width="36" height="36" />
+          <h1>Reuleaux Web</h1>
+        </div>
         <nav>
           <button className={tab === "bowl" ? "active" : ""} onClick={() => setTab("bowl")}>
             Bowl Generator
