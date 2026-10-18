@@ -44,6 +44,10 @@ export interface BowlParams {
   /** The original app always includes a blue bounding-box guide rect in every file.
    * Off by default here; on for original-app fidelity. */
   includeBoundingBox?: boolean;
+  /** The original app splits a finishing pass into partN files once its path list
+   * gets long (confirmed via real sample output) — the exact threshold it uses isn't
+   * documented, so this is an approximation, exposed here so it can be tuned. */
+  maxPathsPerFile?: number;
 }
 
 const ROUGH_Z_STEP = 4; // mm, per the vertical model used for all roughing passes
@@ -83,6 +87,7 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
     footRelief = true,
     anchor,
     includeBoundingBox = false,
+    maxPathsPerFile = 250,
   } = params;
 
   if (sides === "custom" && !customShape) {
@@ -251,7 +256,7 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
 
   const files: GeneratedFile[] = [];
   const addSplit = (basename: string, paths: CutPath[]) => {
-    const chunks = splitIntoChunks(paths);
+    const chunks = splitIntoChunks(paths, maxPathsPerFile);
     chunks.forEach((chunk, i) => {
       const suffix = chunks.length > 1 ? (i === 0 ? "" : `part${i + 1}`) : "";
       const name = `${basename}${suffix}.svg`;
@@ -272,10 +277,12 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
     });
   };
 
-  addSplit("ReuleauxExterior", exteriorPaths);
+  // Grouped by surface (exterior, then interior), roughing before finishing within
+  // each group — the order you'd actually cut them in.
   addSplit("ReuleauxExteriorRoughing", exteriorRoughPaths);
-  addSplit("ReuleauxInterior", interiorPaths);
+  addSplit("ReuleauxExterior", exteriorPaths);
   addSplit("ReuleauxInteriorRoughing", interiorRoughPaths);
+  addSplit("ReuleauxInterior", interiorPaths);
 
   return files;
 }

@@ -93,7 +93,9 @@ export function RippleTool({ unit }: { unit: Unit }) {
           </div>
         )}
         <div className="downloads">
-          <p>{files.length} file(s) generated.</p>
+          <p>
+            {files.length} {files.length === 1 ? "file" : "files"} generated.
+          </p>
           <button onClick={() => downloadAllAsZip(files, "reuleaux-ripple.zip")}>Download all (.zip)</button>
           <ul>
             {files.map((f) => (

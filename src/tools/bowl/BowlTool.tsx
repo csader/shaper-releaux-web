@@ -56,6 +56,7 @@ const DEFAULTS: BowlParams = {
   interiorModel: "circumferential",
   exteriorModel: "circumferential",
   footRelief: true,
+  maxPathsPerFile: 250,
 };
 
 function NumberField({
@@ -81,6 +82,32 @@ function NumberField({
         step={step}
         value={mmToDisplay(valueMm, unit)}
         onChange={(e) => onChangeMm(displayToMm(parseFloat(e.target.value) || 0, unit))}
+      />
+    </label>
+  );
+}
+
+/** Plain integer input, no unit conversion — e.g. a path count, not a physical size. */
+function IntegerField({
+  label,
+  value,
+  onChange,
+  min = 1,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  min?: number;
+}) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <input
+        type="number"
+        step={1}
+        min={min}
+        value={value}
+        onChange={(e) => onChange(Math.max(min, Math.round(parseFloat(e.target.value) || min)))}
       />
     </label>
   );
@@ -370,6 +397,15 @@ export function BowlTool({ unit }: { unit: Unit }) {
             A foot relief pocket is included automatically in the roughing file when there's room for it.
           </p>
         )}
+        <IntegerField
+          label="Max paths per file"
+          value={params.maxPathsPerFile ?? 250}
+          onChange={(v) => set("maxPathsPerFile", v)}
+        />
+        <p className="hint-note">
+          The original app splits a finishing pass into part2/part3/etc. files once its path list gets long — this
+          sets the threshold (an approximation of the original's own, undocumented, rule).
+        </p>
 
         <label className="field checkbox-field">
           <input
@@ -467,7 +503,9 @@ export function BowlTool({ unit }: { unit: Unit }) {
         </div>
 
         <div className="downloads">
-          <p>{files.length} file(s) generated.</p>
+          <p>
+            {files.length} {files.length === 1 ? "file" : "files"} generated.
+          </p>
           <button onClick={() => downloadAllAsZip(files, "reuleaux-bowl.zip")}>Download all (.zip)</button>
           <ul>
             {files.map((f) => (
