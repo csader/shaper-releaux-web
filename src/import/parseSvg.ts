@@ -20,6 +20,14 @@ export interface Candidate {
 const SHAPE_SELECTOR = "path, polygon, polyline, rect, circle, ellipse";
 const MAX_POINTS_PER_LOOP = 200;
 const MIN_ARC_LENGTH_STEP = 0.5; // in the element's own user units
+// A real decorative outline is a handful of shapes at most. A Shaper toolpath file
+// (like the ones this app itself exports) can have hundreds of concentric rings —
+// treating each as a hole candidate blows up the pairwise overlap/containment checks
+// downstream (O(n²) comparisons, each itself O(n) on ~200-point loops). Stop sampling
+// once we're clearly past "simple outline" territory rather than grinding through the
+// rest and freezing the tab; the caller surfaces this as a clear rejection, not silent
+// truncation.
+export const MAX_CANDIDATES = 40;
 
 function matrixPoint(m: DOMMatrix, x: number, y: number): { x: number; y: number } {
   const p = new DOMPoint(x, y).matrixTransform(m);
@@ -103,6 +111,7 @@ export function parseCandidateLoops(svgText: string): Candidate[] {
   try {
     const elements = Array.from(imported.querySelectorAll(SHAPE_SELECTOR)) as SVGGeometryElement[];
     for (const el of elements) {
+      if (candidates.length > MAX_CANDIDATES) break; // see MAX_CANDIDATES note above
       const ctm = el.getCTM();
       if (!ctm) continue;
 

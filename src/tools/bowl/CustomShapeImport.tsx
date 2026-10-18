@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { parseCandidateLoops, type Candidate } from "../../import/parseSvg";
+import { MAX_CANDIDATES, parseCandidateLoops, type Candidate } from "../../import/parseSvg";
 import {
   compoundShapeToPathData,
   holeIsContained,
@@ -100,14 +100,31 @@ export function CustomShapeImport({ bitSize, mmCut, outerDiameter, onImport }: P
 
   function handleFile(file: File) {
     setError(null);
+    setCandidates([]);
     const reader = new FileReader();
     reader.onload = () => {
       try {
         const text = String(reader.result ?? "");
+        // Cheap fail-fast: this is almost always someone uploading a file this app
+        // (or the original Reuleaux app) already exported — hundreds of concentric
+        // toolpath rings, not a plain outline. Catch it before any DOM/sampling work.
+        if (/\bshaper:cutDepth\b/.test(text)) {
+          setError(
+            "This looks like a Shaper Origin toolpath file (it has cutDepth encoding), not a plain decorative " +
+              "outline — upload a single simple shape instead (e.g. one you drew or exported from a design tool).",
+          );
+          return;
+        }
         const found = parseCandidateLoops(text);
         if (found.length === 0) {
           setError("No closed shapes found in this file.");
-          setCandidates([]);
+          return;
+        }
+        if (found.length > MAX_CANDIDATES) {
+          setError(
+            `Found over ${MAX_CANDIDATES} closed shapes in this file — that's too many for a simple outline ` +
+              "import. Try a file with just one or two shapes (an outline, plus maybe a hole).",
+          );
           return;
         }
         const sorted = [...found].sort((a, b) => b.area - a.area);
@@ -118,7 +135,6 @@ export function CustomShapeImport({ bitSize, mmCut, outerDiameter, onImport }: P
         setHoleIds(new Set(suggestedHoles.map((c) => c.id)));
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not parse this file.");
-        setCandidates([]);
       }
     };
     reader.readAsText(file);
