@@ -1,0 +1,122 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: #1b1b1f;
+  color: #e8e8ea;
+}
+
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+header h1 {
+  margin: 0 0 0.75rem;
+  font-size: 1.4rem;
+}
+
+nav button {
+  margin-right: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #2a2a30;
+  color: #e8e8ea;
+  border: 1px solid #3c3c44;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+nav button.active {
+  background: #4a6cf7;
+  border-color: #4a6cf7;
+}
+
+.tool {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+}
+
+.field input,
+.field select {
+  padding: 0.4rem;
+  background: #2a2a30;
+  color: #e8e8ea;
+  border: 1px solid #3c3c44;
+  border-radius: 4px;
+}
+
+.license-note {
+  font-size: 0.75rem;
+  color: #9a9aa2;
+}
+
+.preview-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.svg-box {
+  background: #fff;
+  border-radius: 6px;
+  padding: 0.5rem;
+}
+
+.svg-box svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* The exported files intentionally use zero-width strokes (matching the original
+   app's convention) — the readme itself notes this makes them hard to view. Override
+   for the on-screen preview only; exported file content is untouched. */
+.svg-box svg path {
+  stroke-width: 0.4px !important;
+  opacity: 0.6 !important;
+}
+
+.downloads {
+  margin-top: 1rem;
+}
+
+.downloads ul {
+  list-style: none;
+  padding: 0;
+  font-size: 0.85rem;
+}
+
+.downloads li {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid #2a2a30;
+}
+
+.downloads button {
+  background: #2a2a30;
+  color: #e8e8ea;
+  border: 1px solid #3c3c44;
+  border-radius: 4px;
+  padding: 0.2rem 0.6rem;
+  cursor: pointer;
+}
