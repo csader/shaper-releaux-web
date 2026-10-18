@@ -27,4 +27,25 @@ describe("foot relief pocket vs. real bowl output", () => {
     expect(parseFloat(radius)).toBeCloseTo(109.0, 2);
     expect(parseFloat(cutDepth)).toBeCloseTo(-9, 2);
   });
+
+  it("omits the relief pocket when footRelief is explicitly disabled", () => {
+    const files = generateBowl({
+      sides: 5,
+      outerDiameter: 250,
+      innerDiameter: 234,
+      outerDepth: 60,
+      innerDepth: 50,
+      footHeight: 2,
+      footDiameter: 125,
+      zTouchHeight: 50,
+      bitSize: 8,
+      mmCut: 0.5,
+      interiorModel: "circumferential",
+      exteriorModel: "circumferential",
+      footRelief: false,
+    });
+
+    const roughing = files.find((f) => f.name.startsWith("ReuleauxExteriorRoughing"))!;
+    expect(roughing.content).not.toContain('id="Relief"');
+  });
 });

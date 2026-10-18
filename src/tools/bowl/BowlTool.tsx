@@ -29,6 +29,7 @@ const DEFAULTS: BowlParams = {
   mmCut: 0.5,
   interiorModel: "circumferential",
   exteriorModel: "circumferential",
+  footRelief: true,
 };
 
 function NumberField({
@@ -203,14 +204,24 @@ export function BowlTool({ unit }: { unit: Unit }) {
         <NumberField label="Inner depth" valueMm={params.innerDepth} onChangeMm={(v) => set("innerDepth", v)} unit={unit} />
         <NumberField label="Foot height" valueMm={params.footHeight} onChangeMm={(v) => set("footHeight", v)} unit={unit} />
         <NumberField label="Foot diameter" valueMm={params.footDiameter} onChangeMm={(v) => set("footDiameter", v)} unit={unit} />
+        <label className="field checkbox-field">
+          <input
+            type="checkbox"
+            checked={params.footRelief ?? true}
+            onChange={(e) => set("footRelief", e.target.checked)}
+          />
+          <span>Include foot relief pocket</span>
+        </label>
         <NumberField label="Z-touch height" valueMm={params.zTouchHeight} onChangeMm={(v) => set("zTouchHeight", v)} unit={unit} />
         <NumberField label="Bit size" valueMm={params.bitSize} onChangeMm={(v) => set("bitSize", v)} unit={unit} step={0.5} />
         <NumberField label="MM cut (width of cut paths)" valueMm={params.mmCut} onChangeMm={(v) => set("mmCut", v)} unit={unit} step={0.1} />
         <ModelToggle label="Interior finishing model" value={params.interiorModel} onChange={(v) => set("interiorModel", v)} />
         <ModelToggle label="Exterior finishing model" value={params.exteriorModel} onChange={(v) => set("exteriorModel", v)} />
-        <p className="hint-note">
-          A foot relief pocket is included automatically in the roughing file when there's room for it.
-        </p>
+        {params.footRelief !== false && (
+          <p className="hint-note">
+            A foot relief pocket is included automatically in the roughing file when there's room for it.
+          </p>
+        )}
       </div>
 
       <div className="preview">

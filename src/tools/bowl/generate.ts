@@ -34,6 +34,9 @@ export interface BowlParams {
   mmCut: number;
   interiorModel: SteppingModel;
   exteriorModel: SteppingModel;
+  /** Whether to include the foot relief pocket in the roughing file, when there's
+   * room for it. Defaults to true (matching the original app's always-on behavior). */
+  footRelief?: boolean;
 }
 
 const ROUGH_Z_STEP = 4; // mm, per the vertical model used for all roughing passes
@@ -59,6 +62,7 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
     mmCut,
     interiorModel,
     exteriorModel,
+    footRelief = true,
   } = params;
 
   if (sides === "custom" && !customShape) {
@@ -189,7 +193,7 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
   // InnerDiameter) [i.e. inset by the lip width on each side], depth = zFoot − 1mm.
   const lipWidth = (outerDiameter - innerDiameter) / 2;
   const reliefD = footDiameter - 2 * lipWidth;
-  if (reliefD >= minCuttable) {
+  if (footRelief && reliefD >= minCuttable) {
     exteriorRoughPaths.push({
       id: "Relief",
       d: ringPathData(reliefD, outerAspectY, false),
