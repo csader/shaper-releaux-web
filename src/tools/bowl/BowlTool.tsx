@@ -5,6 +5,7 @@ import type { Sides } from "../../geometry/shapes";
 import type { SteppingModel } from "../../geometry/profile";
 import { downloadAllAsZip, downloadFile } from "../../download/download";
 import { displayToMm, mmToDisplay, unitLabel, type Unit } from "../../units";
+import { shadePreviewSvg } from "../../svg/previewShading";
 
 const SIDE_LABELS: Record<Sides, string> = {
   1: "1 — Circle / Ellipse",
@@ -104,6 +105,14 @@ export function BowlTool({ unit }: { unit: Unit }) {
 
   const exteriorPreview = files.find((f) => f.name.startsWith("ReuleauxExterior") && !f.name.includes("Roughing"));
   const interiorPreview = files.find((f) => f.name.startsWith("ReuleauxInterior") && !f.name.includes("Roughing"));
+  const exteriorPreviewHtml = useMemo(
+    () => (exteriorPreview ? shadePreviewSvg(exteriorPreview.content) : ""),
+    [exteriorPreview],
+  );
+  const interiorPreviewHtml = useMemo(
+    () => (interiorPreview ? shadePreviewSvg(interiorPreview.content) : ""),
+    [interiorPreview],
+  );
 
   return (
     <div className="tool">
@@ -141,6 +150,10 @@ export function BowlTool({ unit }: { unit: Unit }) {
             <p className="hint-note">
               Custom shapes can produce large files with the circumferential model — radial is a lighter default
               here.
+            </p>
+            <p className="hint-note">
+              The uploaded outline only sets proportions — Outer/Inner diameter below still set the real-world size,
+              same as for a built-in shape.
             </p>
           </>
         )}
@@ -182,6 +195,11 @@ export function BowlTool({ unit }: { unit: Unit }) {
           </label>
         )}
 
+        <ModelToggle label="Interior finishing model" value={params.interiorModel} onChange={(v) => set("interiorModel", v)} />
+        <ModelToggle label="Exterior finishing model" value={params.exteriorModel} onChange={(v) => set("exteriorModel", v)} />
+        <NumberField label="Outer depth" valueMm={params.outerDepth} onChangeMm={(v) => set("outerDepth", v)} unit={unit} />
+        <NumberField label="Inner depth" valueMm={params.innerDepth} onChangeMm={(v) => set("innerDepth", v)} unit={unit} />
+        <NumberField label="Bit size" valueMm={params.bitSize} onChangeMm={(v) => set("bitSize", v)} unit={unit} step={0.5} />
         <NumberField label="Outer diameter" valueMm={params.outerDiameter} onChangeMm={(v) => set("outerDiameter", v)} unit={unit} />
         {independentAxes && (
           <NumberField
@@ -200,8 +218,6 @@ export function BowlTool({ unit }: { unit: Unit }) {
             unit={unit}
           />
         )}
-        <NumberField label="Outer depth" valueMm={params.outerDepth} onChangeMm={(v) => set("outerDepth", v)} unit={unit} />
-        <NumberField label="Inner depth" valueMm={params.innerDepth} onChangeMm={(v) => set("innerDepth", v)} unit={unit} />
         <NumberField label="Foot height" valueMm={params.footHeight} onChangeMm={(v) => set("footHeight", v)} unit={unit} />
         <NumberField label="Foot diameter" valueMm={params.footDiameter} onChangeMm={(v) => set("footDiameter", v)} unit={unit} />
         <label className="field checkbox-field">
@@ -213,10 +229,7 @@ export function BowlTool({ unit }: { unit: Unit }) {
           <span>Include foot relief pocket</span>
         </label>
         <NumberField label="Z-touch height" valueMm={params.zTouchHeight} onChangeMm={(v) => set("zTouchHeight", v)} unit={unit} />
-        <NumberField label="Bit size" valueMm={params.bitSize} onChangeMm={(v) => set("bitSize", v)} unit={unit} step={0.5} />
         <NumberField label="MM cut (width of cut paths)" valueMm={params.mmCut} onChangeMm={(v) => set("mmCut", v)} unit={unit} step={0.1} />
-        <ModelToggle label="Interior finishing model" value={params.interiorModel} onChange={(v) => set("interiorModel", v)} />
-        <ModelToggle label="Exterior finishing model" value={params.exteriorModel} onChange={(v) => set("exteriorModel", v)} />
         {params.footRelief !== false && (
           <p className="hint-note">
             A foot relief pocket is included automatically in the roughing file when there's room for it.
@@ -229,13 +242,13 @@ export function BowlTool({ unit }: { unit: Unit }) {
           {exteriorPreview && (
             <div>
               <h3>Exterior</h3>
-              <div className="svg-box" dangerouslySetInnerHTML={{ __html: exteriorPreview.content }} />
+              <div className="svg-box" dangerouslySetInnerHTML={{ __html: exteriorPreviewHtml }} />
             </div>
           )}
           {interiorPreview && (
             <div>
               <h3>Interior</h3>
-              <div className="svg-box" dangerouslySetInnerHTML={{ __html: interiorPreview.content }} />
+              <div className="svg-box" dangerouslySetInnerHTML={{ __html: interiorPreviewHtml }} />
             </div>
           )}
         </div>

@@ -19,6 +19,8 @@ interface Props {
 }
 
 const PREVIEW_SCALES = [1, 0.5, 0.1];
+// See the comment at the auto-suggest filter below.
+const NEAR_DUPLICATE_AREA_RATIO = 0.9;
 
 function boundingWidthOf(loop: Loop): number {
   let min = Infinity;
@@ -42,6 +44,22 @@ export function CustomShapeImport({ bitSize, mmCut, outerDiameter, onImport }: P
 
   const outerCandidate = candidates.find((c) => c.id === outerId) ?? null;
   const holeCandidates = candidates.filter((c) => holeIds.has(c.id));
+
+  // Flag candidates that are nearly the same size as the outer boundary (and inside
+  // it) — almost always a stroke outlined-to-fill (e.g. Illustrator's "Outline
+  // Stroke"), not an intentional hole. Shown as a hint next to the row either way,
+  // since the user may have picked one manually even though it wasn't auto-suggested.
+  const nearDuplicateIds = useMemo(() => {
+    if (!outerCandidate) return new Set<string>();
+    const ids = new Set<string>();
+    for (const c of candidates) {
+      if (c.id === outerCandidate.id) continue;
+      if (c.area >= outerCandidate.area * NEAR_DUPLICATE_AREA_RATIO && holeIsContained(c.loop, outerCandidate.loop)) {
+        ids.add(c.id);
+      }
+    }
+    return ids;
+  }, [candidates, outerCandidate]);
 
   const validation = useMemo(() => {
     if (!outerCandidate) return { ok: false, errors: [] as string[], warnings: [] as string[] };
@@ -129,7 +147,16 @@ export function CustomShapeImport({ bitSize, mmCut, outerDiameter, onImport }: P
         }
         const sorted = [...found].sort((a, b) => b.area - a.area);
         const suggestedOuter = sorted[0];
-        const suggestedHoles = sorted.slice(1).filter((c) => holeIsContained(c.loop, suggestedOuter.loop));
+        // "Contained" alone isn't enough to guess a candidate is a real hole: a stroke
+        // outlined-to-fill in Illustrator (or similar) produces two nearly-identical
+        // nested loops (the stroke's inner/outer edge), not a hole. A genuine hole is
+        // normally meaningfully smaller than the outer boundary, so only auto-suggest
+        // candidates well below the outer's area — the near-duplicate case is left for
+        // the user to notice (flagged separately below) rather than silently carving
+        // out almost the whole shape by default.
+        const suggestedHoles = sorted
+          .slice(1)
+          .filter((c) => c.area < suggestedOuter.area * NEAR_DUPLICATE_AREA_RATIO && holeIsContained(c.loop, suggestedOuter.loop));
         setCandidates(found);
         setOuterId(suggestedOuter.id);
         setHoleIds(new Set(suggestedHoles.map((c) => c.id)));
@@ -152,29 +179,39 @@ export function CustomShapeImport({ bitSize, mmCut, outerDiameter, onImport }: P
       />
       {error && <p className="error-note">{error}</p>}
 
-      {candidates.length > 0 && (
+      {candidates.length === 1 && <p className="hint-note">1 closed shape found — using it as the outline.</p>}
+
+      {candidates.length > 1 && (
         <div className="candidate-list">
-          <p className="hint-note">{candidates.length} closed shape(s) found. Pick the outer boundary and any holes.</p>
+          <p className="hint-note">{candidates.length} closed shapes found. Pick the outer boundary and any holes.</p>
           {candidates.map((c) => (
-            <label key={c.id} className="candidate-row">
-              <input type="radio" name="outer" checked={outerId === c.id} onChange={() => setOuterId(c.id)} />
-              <span>outer</span>
-              <input
-                type="checkbox"
-                disabled={outerId === c.id}
-                checked={holeIds.has(c.id)}
-                onChange={(e) => {
-                  const next = new Set(holeIds);
-                  if (e.target.checked) next.add(c.id);
-                  else next.delete(c.id);
-                  setHoleIds(next);
-                }}
-              />
-              <span>hole</span>
-              <span className="candidate-id">
-                {c.id} (area {Math.round(c.area)})
-              </span>
-            </label>
+            <div key={c.id}>
+              <label className="candidate-row">
+                <input type="radio" name="outer" checked={outerId === c.id} onChange={() => setOuterId(c.id)} />
+                <span>outer</span>
+                <input
+                  type="checkbox"
+                  disabled={outerId === c.id}
+                  checked={holeIds.has(c.id)}
+                  onChange={(e) => {
+                    const next = new Set(holeIds);
+                    if (e.target.checked) next.add(c.id);
+                    else next.delete(c.id);
+                    setHoleIds(next);
+                  }}
+                />
+                <span>hole</span>
+                <span className="candidate-id">
+                  {c.id} (area {Math.round(c.area)})
+                </span>
+              </label>
+              {nearDuplicateIds.has(c.id) && (
+                <p className="hint-note candidate-subnote">
+                  Nearly the same size as the outer boundary — this usually means a stroke was outlined to a fill
+                  (e.g. Illustrator's "Outline Stroke") rather than a real hole. Leave unchecked for a solid shape.
+                </p>
+              )}
+            </div>
           ))}
         </div>
       )}

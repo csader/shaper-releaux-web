@@ -259,6 +259,10 @@ header h1 {
   color: #9a9aa2;
 }
 
+.candidate-subnote {
+  margin: 0 0 0.3rem 1.5rem;
+}
+
 .error-note {
   font-size: 0.78rem;
   color: #ff6b6b;
