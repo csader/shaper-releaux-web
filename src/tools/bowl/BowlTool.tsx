@@ -224,8 +224,8 @@ export function BowlTool({ unit }: { unit: Unit }) {
     }
   }, [params, isCustom]);
 
-  const exteriorPreview = files.find((f) => f.name.startsWith("ReuleauxExterior") && !f.name.includes("Roughing"));
-  const interiorPreview = files.find((f) => f.name.startsWith("ReuleauxInterior") && !f.name.includes("Roughing"));
+  const exteriorPreview = files.find((f) => f.kind === "exterior");
+  const interiorPreview = files.find((f) => f.kind === "interior");
   const exteriorPreviewHtml = useMemo(
     () => (exteriorPreview ? shadePreviewSvg(exteriorPreview.content) : ""),
     [exteriorPreview],
@@ -253,7 +253,7 @@ export function BowlTool({ unit }: { unit: Unit }) {
             onClick={() => {
               setShapeSource("builtin");
               setIndependentAxes(false);
-              setParams((p) => ({ ...p, sides: DEFAULTS.sides, customShape: undefined }));
+              setParams((p) => ({ ...p, sides: DEFAULTS.sides, customShape: undefined, customShapeName: undefined }));
             }}
           >
             Choose a built-in shape
@@ -268,6 +268,7 @@ export function BowlTool({ unit }: { unit: Unit }) {
               outerDiameter={params.outerDiameter}
               onImport={(shape) => set("customShape", shape ?? undefined)}
               onSuggestedWidth={(mm) => set("outerDiameter", mm)}
+              onFileName={(name) => set("customShapeName", name)}
             />
             <p className="hint-note">
               Custom shapes can produce large files with the circumferential model — radial is a lighter default

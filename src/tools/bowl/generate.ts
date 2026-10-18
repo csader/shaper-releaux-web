@@ -21,6 +21,9 @@ export interface BowlParams {
   sides: Sides | "custom";
   /** Required when sides === "custom" — normalized shape from the import picker. */
   customShape?: CompoundShape;
+  /** Original uploaded file's name (sans extension) — used only for file naming when
+   * sides === "custom", in place of a built-in shape name like "Pentagon". */
+  customShapeName?: string;
   outerDiameter: number;
   /** Independent Y dimension for sides=1 (ellipse) or sides=4 (rectangle special case). */
   outerDiameterY?: number;
@@ -81,6 +84,27 @@ export function shapeCenterFor(params: Pick<BowlParams, "sides" | "outerDiameter
     cy -= oddCircumradius(params.sides, params.outerDiameter) - params.outerDiameter / 2;
   }
   return { cx, cy };
+}
+
+const SIDE_NAMES: Partial<Record<Sides, string>> = {
+  2: "Heart",
+  3: "Triangle",
+  5: "Pentagon",
+  6: "Hexagon",
+  7: "Heptagon",
+};
+
+/** Human-readable shape name for file naming — "Pentagon", "Ellipse", the uploaded
+ * file's own name for a custom shape, etc. Not used anywhere geometry-affecting. */
+export function shapeNameFor(params: Pick<BowlParams, "sides" | "outerDiameterY" | "customShapeName">): string {
+  if (params.sides === "custom") return params.customShapeName?.trim() || "Custom";
+  if (params.sides === 1) return params.outerDiameterY !== undefined ? "Ellipse" : "Circle";
+  if (params.sides === 4) return params.outerDiameterY !== undefined ? "Rectangle" : "Square";
+  return SIDE_NAMES[params.sides] ?? "Shape";
+}
+
+function sanitizeForFilename(s: string): string {
+  return s.replace(/[\\/:*?"<>|]+/g, "").trim() || "Shape";
 }
 
 export function generateBowl(params: BowlParams): GeneratedFile[] {
@@ -266,14 +290,17 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
   const anchorPoint = anchor ? resolveAnchorPoint(anchor, box, { x: cx, y: cy }) : null;
   const anchorPathData = anchorPoint ? anchorTrianglePathData(anchorPoint.x, anchorPoint.y, anchor!.position) : undefined;
 
+  const shapeName = sanitizeForFilename(shapeNameFor(params));
+
   const files: GeneratedFile[] = [];
-  const addSplit = (basename: string, paths: CutPath[]) => {
+  const addSplit = (step: number, label: string, kind: GeneratedFile["kind"], paths: CutPath[]) => {
     const chunks = splitIntoChunks(paths, maxPathsPerFile);
     chunks.forEach((chunk, i) => {
-      const suffix = chunks.length > 1 ? (i === 0 ? "" : `part${i + 1}`) : "";
-      const name = `${basename}${suffix}.svg`;
+      const partSuffix = chunks.length > 1 && i > 0 ? ` - part${i + 1}` : "";
+      const name = `Step ${step} - ${label} - ${shapeName}${partSuffix}.svg`;
       files.push({
         name,
+        kind,
         content: buildShaperSvg({
           boundingWidthMm: boundingWidth,
           boundingHeightMm: boundingHeight,
@@ -289,12 +316,13 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
     });
   };
 
-  // Grouped by surface (exterior, then interior), roughing before finishing within
-  // each group — the order you'd actually cut them in.
-  addSplit("ReuleauxExteriorRoughing", exteriorRoughPaths);
-  addSplit("ReuleauxExterior", exteriorPaths);
-  addSplit("ReuleauxInteriorRoughing", interiorRoughPaths);
-  addSplit("ReuleauxInterior", interiorPaths);
+  // Matches the original app documentation's own "Order Of Operations": interior
+  // roughing, interior finishing, flip the wood over, exterior roughing, exterior
+  // finishing — carving the interior first, while the stock is still fully intact.
+  addSplit(1, "Interior Roughing", "interior-roughing", interiorRoughPaths);
+  addSplit(2, "Interior", "interior", interiorPaths);
+  addSplit(3, "Exterior Roughing", "exterior-roughing", exteriorRoughPaths);
+  addSplit(4, "Exterior", "exterior", exteriorPaths);
 
   return files;
 }

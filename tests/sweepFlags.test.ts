@@ -64,8 +64,8 @@ describe("generated ring outlines are convex (no inverted/star arcs)", () => {
   it("produces convex exterior and interior finishing rings for every shape", () => {
     for (const sides of [1, 2, 3, 4, 5, 6, 7] as const) {
       const files = generateBowl({ ...baseParams, sides });
-      for (const kind of ["ReuleauxExterior", "ReuleauxInterior"]) {
-        const file = files.find((f) => f.name.startsWith(kind) && !f.name.includes("Roughing"))!;
+      for (const kind of ["exterior", "interior"] as const) {
+        const file = files.find((f) => f.kind === kind)!;
         const d = file.content.match(/<path[\s\S]*?\sd="([^"]+)"/)![1];
         assertConvex(d, `sides=${sides} ${kind}`);
       }

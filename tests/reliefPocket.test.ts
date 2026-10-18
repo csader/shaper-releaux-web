@@ -20,7 +20,7 @@ describe("foot relief pocket vs. real bowl output", () => {
       exteriorModel: "circumferential",
     });
 
-    const roughing = files.find((f) => f.name.startsWith("ReuleauxExteriorRoughing"))!;
+    const roughing = files.find((f) => f.kind === "exterior-roughing")!;
     const match = roughing.content.match(/id="Relief"[\s\S]*?d="M [0-9.]+,[0-9.]+ A ([0-9.]+),[\s\S]*?shaper:cutDepth="(-?[0-9.]+)mm"/);
     expect(match).not.toBeNull();
     const [, radius, cutDepth] = match!;
@@ -45,7 +45,7 @@ describe("foot relief pocket vs. real bowl output", () => {
       footRelief: false,
     });
 
-    const roughing = files.find((f) => f.name.startsWith("ReuleauxExteriorRoughing"))!;
+    const roughing = files.find((f) => f.kind === "exterior-roughing")!;
     expect(roughing.content).not.toContain('id="Relief"');
   });
 });

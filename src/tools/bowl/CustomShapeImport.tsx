@@ -18,6 +18,12 @@ interface Props {
   onImport: (shape: CompoundShape | null) => void;
   /** Called with the file's declared real-world width (mm), when it has one. */
   onSuggestedWidth?: (mm: number) => void;
+  /** Called with the uploaded file's name (sans extension), for use in export file naming. */
+  onFileName?: (name: string) => void;
+}
+
+function stripExtension(filename: string): string {
+  return filename.replace(/\.[^./\\]+$/, "");
 }
 
 const PREVIEW_SCALES = [1, 0.5, 0.1];
@@ -38,7 +44,7 @@ function holesOverlap(a: Loop, b: Loop): boolean {
   return holeIsContained(a, b) || holeIsContained(b, a) || !isSimplePolygon([...a, ...b]);
 }
 
-export function CustomShapeImport({ bitSize, mmCut, outerDiameter, onImport, onSuggestedWidth }: Props) {
+export function CustomShapeImport({ bitSize, mmCut, outerDiameter, onImport, onSuggestedWidth, onFileName }: Props) {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [outerId, setOuterId] = useState<string | null>(null);
   const [holeIds, setHoleIds] = useState<Set<string>>(new Set());
@@ -152,6 +158,8 @@ export function CustomShapeImport({ bitSize, mmCut, outerDiameter, onImport, onS
           );
           return;
         }
+
+        onFileName?.(stripExtension(file.name));
 
         const size = extractDeclaredSizeMm(text);
         if (size) {
