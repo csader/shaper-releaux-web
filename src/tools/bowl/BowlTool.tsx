@@ -153,7 +153,7 @@ export function BowlTool({ unit }: { unit: Unit }) {
               here.
             </p>
             <p className="hint-note">
-              The uploaded outline only sets proportions — Outer/Inner diameter below still set the real-world size,
+              The uploaded outline only sets proportions — Outer/Inner width below still set the real-world size,
               same as for a built-in shape.
             </p>
           </>
@@ -201,26 +201,26 @@ export function BowlTool({ unit }: { unit: Unit }) {
         <NumberField label="Outer depth" valueMm={params.outerDepth} onChangeMm={(v) => set("outerDepth", v)} unit={unit} />
         <NumberField label="Inner depth" valueMm={params.innerDepth} onChangeMm={(v) => set("innerDepth", v)} unit={unit} />
         <NumberField label="Bit size" valueMm={params.bitSize} onChangeMm={(v) => set("bitSize", v)} unit={unit} step={0.5} />
-        <NumberField label="Outer diameter" valueMm={params.outerDiameter} onChangeMm={(v) => set("outerDiameter", v)} unit={unit} />
+        <NumberField label="Outer width" valueMm={params.outerDiameter} onChangeMm={(v) => set("outerDiameter", v)} unit={unit} />
         {independentAxes && (
           <NumberField
-            label="Outer diameter Y"
+            label="Outer height"
             valueMm={params.outerDiameterY ?? params.outerDiameter}
             onChangeMm={(v) => set("outerDiameterY", v)}
             unit={unit}
           />
         )}
-        <NumberField label="Inner diameter" valueMm={params.innerDiameter} onChangeMm={(v) => set("innerDiameter", v)} unit={unit} />
+        <NumberField label="Inner width" valueMm={params.innerDiameter} onChangeMm={(v) => set("innerDiameter", v)} unit={unit} />
         {independentAxes && (
           <NumberField
-            label="Inner diameter Y"
+            label="Inner height"
             valueMm={params.innerDiameterY ?? params.innerDiameter}
             onChangeMm={(v) => set("innerDiameterY", v)}
             unit={unit}
           />
         )}
         <NumberField label="Foot height" valueMm={params.footHeight} onChangeMm={(v) => set("footHeight", v)} unit={unit} />
-        <NumberField label="Foot diameter" valueMm={params.footDiameter} onChangeMm={(v) => set("footDiameter", v)} unit={unit} />
+        <NumberField label="Foot width" valueMm={params.footDiameter} onChangeMm={(v) => set("footDiameter", v)} unit={unit} />
         <label className="field checkbox-field">
           <input
             type="checkbox"

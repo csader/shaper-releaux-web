@@ -197,13 +197,13 @@ export function CustomShapeImport({ bitSize, mmCut, outerDiameter, onImport, onS
       {declaredSize && declaredSize !== "none" && (
         <p className="hint-note">
           Detected real-world size: {declaredSize.widthMm.toFixed(1)}mm × {declaredSize.heightMm.toFixed(1)}mm —
-          Outer Diameter pre-filled below (you can still change it).
+          Outer width pre-filled below (you can still change it).
         </p>
       )}
       {declaredSize === "none" && (
         <p className="warning-note">
           This file doesn't declare physical units (mm/in/etc.) for its size — only its proportions were used.
-          Set Outer Diameter below to the real-world size you want.
+          Set Outer width below to the real-world size you want.
         </p>
       )}
 
