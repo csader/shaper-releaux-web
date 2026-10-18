@@ -178,7 +178,7 @@ export function CustomShapeImport({ bitSize, mmCut, outerDiameter, onImport }: P
         <div className="scale-preview">
           {PREVIEW_SCALES.map((s) => (
             <div key={s} className="scale-preview-item">
-              <svg viewBox="-60 -60 120 120" width="100" height="100">
+              <svg viewBox="-60 -60 120 120" width="64" height="64">
                 <path d={compoundShapeToPathData(scaleCompoundShape(shape, 100 * s, 0, 0))} fill="black" fillRule="evenodd" />
               </svg>
               <span>{Math.round(s * 100)}%</span>
