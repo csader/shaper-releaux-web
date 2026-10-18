@@ -9,6 +9,7 @@ import {
 } from "../../geometry/profile";
 import { solveThetaForDepth } from "../../geometry/invert";
 import { shapeOutline, type Sides } from "../../geometry/shapes";
+import { oddCircumradius } from "../../geometry/reuleauxPolygon";
 import { outlineToPathData } from "../../svg/path";
 import { buildShaperSvg, type CutPath } from "../../svg/shaperSvg";
 import { splitIntoChunks } from "../../svg/fileSplit";
@@ -68,7 +69,18 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
   const boundingWidth = outerDiameter + 2 * bitSize;
   const boundingHeight = (outerDiameterY ?? outerDiameter) + 2 * bitSize;
   const cx = outerDiameter / 2;
-  const cy = (outerDiameterY ?? outerDiameter) / 2;
+  // Odd-n true Reuleaux shapes (3, 5, 7) aren't symmetric around their own vertex
+  // circumcenter — the single pointed vertex sticks out farther than the curved side
+  // opposite it (confirmed against both the readme's own worked example and the real
+  // pentagon sample's measured circumcenter). Left uncorrected, the vertex gets
+  // clipped by the declared bounding box — most visible for the triangle, which has
+  // by far the largest offset (~7.7% of D, vs ~2.6% for pentagon, ~1.3% for heptagon).
+  // All rings share this one fixed centre (uniform scale toward one point), so the
+  // offset only needs computing once, from the outer diameter.
+  let cy = (outerDiameterY ?? outerDiameter) / 2;
+  if (sides === 3 || sides === 5 || sides === 7) {
+    cy -= oddCircumradius(sides, outerDiameter) - outerDiameter / 2;
+  }
   const originX = -bitSize;
   const originY = -bitSize;
   const minCuttable = minCuttableDiameter(bitSize, mmCut);
