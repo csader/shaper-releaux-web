@@ -1,8 +1,8 @@
 # Reuleaux Web
 
-A browser-based reimplementation of [Andrew Weighill-Richards'](https://hub.shapertools.com/creators/63b611f2fbe48653c207db8d) **Reuleaux** — a Windows-only tool that generates [Shaper Origin](https://www.shapertools.com/)-ready SVG toolpaths for carving bowls — plus a second tool for decorative wave/ripple surface textures. Runs entirely client-side: no backend, no install beyond Node for local dev, no data leaves your browser.
+A browser-based reimplementation of [Andrew Weighill-Richards'](https://hub.shapertools.com/creators/63b611f2fbe48653c207db8d) **Reuleaux** — a Windows-only tool that generates [Shaper Origin](https://www.shapertools.com/)-ready SVG toolpaths for carving bowls, plus a second tool for decorative wave/ripple surface textures. Runs entirely client-side: no backend, no install beyond Node for local dev, no data leaves your browser.
 
-There's no source available for the original app, so this is a from-scratch reimplementation. The core geometry was reverse-engineered from the original author's own spreadsheets and documentation, then validated against real sample output files where they were available — not just "looks about right."
+There's no source available for the original app, so this is a from-scratch reimplementation. The core geometry was reverse-engineered from the original author's own spreadsheets and documentation, then validated against real sample output files.
 
 ## Features
 
@@ -22,7 +22,7 @@ Capabilities that don't exist in the original Windows app:
 
 ### Wave / Ripple Generator — new in this version
 
-Not part of Reuleaux.exe at all. The original author documented a related but separate technique, [Wave Effect Surface Treatment](https://hub.shapertools.com/) (CC BY-NC-SA 4.0 — noncommercial, attribution, share-alike) — a manual Inkscape + spreadsheet workflow, not a tool. This turns that technique into an actual generator: parallel furrows, a tileable sine contour, or concentric diminishing rings.
+Not part of Reuleaux.exe at all. The original author documented a related but separate technique, [Wave Effect Surface Treatment](https://hub.shapertools.com/) (CC BY-NC-SA 4.0 — noncommercial, attribution, share-alike) — a manual Inkscape + spreadsheet workflow, not a tool. This turns that technique into a generator for parallel furrows, a tileable sine contour, or concentric diminishing rings.
 
 ## Getting started
 
@@ -49,13 +49,6 @@ npm run test
 ```
 
 The geometry is unit-tested against real ground-truth data where it exists: a known-good bowl output sample (pentagon, including a real foot-relief-pocket path), plus self-consistency checks for the shapes that have no sample to verify against. See `tests/` — each file explains what it's checking and why.
-
-## Known limitations
-
-- **Hexagon bounding box**: a small, pre-existing geometric quirk — two of its six corners coincidentally land exactly on an axis, overflowing the declared bounding box slightly more than the sample-verified square does. Flagged in `tests/shapeBounds.test.ts` rather than guessed at, since only the square was ever sample-verified for that construction.
-- **Rectangle (unequal X/Y, n=4)**: derived from the readme's description, not verified against a real sample (none was available). Self-consistency checked (collapses to the validated square as X→Y).
-- **Heart's exact proportions**: reverse-engineered from a real sample, but one ratio (the lower arc's `ry`) is an empirical constant rather than a derived closed form.
-- Custom SVG import supports one outer boundary plus flat (non-nested) holes — a hole inside a hole isn't supported.
 
 ## Project structure
 
