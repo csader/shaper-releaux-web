@@ -6,7 +6,7 @@ import type { SteppingModel } from "../../geometry/profile";
 import { downloadAllAsZip, downloadFile } from "../../download/download";
 import { displayToMm, mmToDisplay, unitLabel, type Unit } from "../../units";
 
-const SIDE_LABELS: Record<Sides | "custom", string> = {
+const SIDE_LABELS: Record<Sides, string> = {
   1: "1 — Circle / Ellipse",
   2: "2 — Heart",
   3: "3 — Reuleaux triangle",
@@ -14,7 +14,6 @@ const SIDE_LABELS: Record<Sides | "custom", string> = {
   5: "5 — Reuleaux pentagon",
   6: "6 — Hexagon",
   7: "7 — Reuleaux heptagon",
-  custom: "Custom (import SVG)",
 };
 
 const DEFAULTS: BowlParams = {
@@ -80,14 +79,17 @@ function ModelToggle({
   );
 }
 
+type ShapeSource = "upload" | "builtin";
+
 export function BowlTool({ unit }: { unit: Unit }) {
   const [params, setParams] = useState<BowlParams>(DEFAULTS);
   const [independentAxes, setIndependentAxes] = useState(false);
+  const [shapeSource, setShapeSource] = useState<ShapeSource>("builtin");
   const set = <K extends keyof BowlParams>(key: K, value: BowlParams[K]) =>
     setParams((p) => ({ ...p, [key]: value }));
 
-  const supportsIndependentAxes = params.sides === 1 || params.sides === 4;
-  const isCustom = params.sides === "custom";
+  const supportsIndependentAxes = shapeSource === "builtin" && (params.sides === 1 || params.sides === 4);
+  const isCustom = shapeSource === "upload";
 
   const files = useMemo(() => {
     if (isCustom && !params.customShape) return [];
@@ -105,25 +107,27 @@ export function BowlTool({ unit }: { unit: Unit }) {
   return (
     <div className="tool">
       <div className="form">
-        <label className="field">
-          <span>Number of sides</span>
-          <select
-            value={params.sides}
-            onChange={(e) => {
-              const raw = e.target.value;
-              const sides = raw === "custom" ? "custom" : (Number(raw) as Sides);
-              set("sides", sides);
-              if (sides !== 1 && sides !== 4) setIndependentAxes(false);
-              if (sides !== "custom") set("customShape", undefined);
+        <div className="shape-source-toggle">
+          <button
+            className={shapeSource === "upload" ? "active" : ""}
+            onClick={() => {
+              setShapeSource("upload");
+              set("sides", "custom");
             }}
           >
-            {Object.entries(SIDE_LABELS).map(([n, label]) => (
-              <option key={n} value={n}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
+            Upload SVG
+          </button>
+          <button
+            className={shapeSource === "builtin" ? "active" : ""}
+            onClick={() => {
+              setShapeSource("builtin");
+              setIndependentAxes(false);
+              setParams((p) => ({ ...p, sides: DEFAULTS.sides, customShape: undefined }));
+            }}
+          >
+            Choose a built-in shape
+          </button>
+        </div>
 
         {isCustom && (
           <>
@@ -138,6 +142,26 @@ export function BowlTool({ unit }: { unit: Unit }) {
               here.
             </p>
           </>
+        )}
+
+        {shapeSource === "builtin" && (
+          <label className="field">
+            <span>Number of sides</span>
+            <select
+              value={params.sides === "custom" ? 5 : params.sides}
+              onChange={(e) => {
+                const sides = Number(e.target.value) as Sides;
+                set("sides", sides);
+                if (sides !== 1 && sides !== 4) setIndependentAxes(false);
+              }}
+            >
+              {Object.entries(SIDE_LABELS).map(([n, label]) => (
+                <option key={n} value={n}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
         )}
 
         {supportsIndependentAxes && (
