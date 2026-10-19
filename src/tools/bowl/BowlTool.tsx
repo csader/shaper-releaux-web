@@ -187,12 +187,24 @@ export function BowlTool({ unit }: { unit: Unit }) {
   const supportsIndependentAxes = shapeSource === "builtin" && (params.sides === 1 || params.sides === 4);
   const isCustom = shapeSource === "upload";
 
+  // Interior-only is treated as a standalone pocket/tray (no foot, no exterior
+  // profile at all — if you wanted one side of an actual two-sided bowl, you'd
+  // export that from the two-sided job instead). Exterior-only is treated as a
+  // standalone carving (no interior hollow). Confirmed against generate.ts: foot
+  // height/diameter/relief only ever feed exteriorDepth()/the relief pocket, and
+  // innerDepth only ever feeds interiorDepth() — neither crosses over.
+  const machiningMode = params.machining ?? "two-sided";
+  const isInteriorOnly = machiningMode === "interior-only";
+  const isExteriorOnly = machiningMode === "exterior-only";
+
   // Not single-valued around the whole profile (the exterior/interior gap varies
   // continuously), so these are the two specific points that actually matter: the
-  // lip (nominal, at the corners for non-circular shapes — it narrows slightly
-  // elsewhere, per the readme) and the floor at the bowl's deepest point.
+  // lip/wall (nominal, at the corners for non-circular shapes — it narrows slightly
+  // elsewhere, per the readme) and the floor at the pocket's deepest point.
   const lipWidth = (params.outerDiameter - params.innerDiameter) / 2;
-  const floorThickness = params.outerDepth - params.innerDepth - params.footHeight;
+  // Foot height only factors in when an exterior/foot is actually part of this job —
+  // for a standalone pocket/tray there's no foot being carved out from below.
+  const floorThickness = params.outerDepth - params.innerDepth - (isInteriorOnly ? 0 : params.footHeight);
 
   const boundingBox = boundingBoxFor(params);
   const shapeCenter = shapeCenterFor(params);
@@ -316,27 +328,39 @@ export function BowlTool({ unit }: { unit: Unit }) {
           </label>
         )}
 
-        {independentFinishingModel ? (
-          <>
-            <ModelToggle label="Interior finishing model" value={params.interiorModel} onChange={(v) => set("interiorModel", v)} />
-            <ModelToggle label="Exterior finishing model" value={params.exteriorModel} onChange={(v) => set("exteriorModel", v)} />
-          </>
-        ) : (
-          <ModelToggle label="Finishing model" value={params.interiorModel} onChange={setBothModels} />
+        {isInteriorOnly && (
+          <ModelToggle label="Finishing model" value={params.interiorModel} onChange={(v) => set("interiorModel", v)} />
         )}
-        <label className="field checkbox-field">
-          <input
-            type="checkbox"
-            checked={independentFinishingModel}
-            onChange={(e) => {
-              setIndependentFinishingModel(e.target.checked);
-              if (!e.target.checked) setBothModels(params.interiorModel);
-            }}
-          />
-          <span>Set interior/exterior finishing models independently</span>
-        </label>
+        {isExteriorOnly && (
+          <ModelToggle label="Finishing model" value={params.exteriorModel} onChange={(v) => set("exteriorModel", v)} />
+        )}
+        {machiningMode === "two-sided" && (
+          <>
+            {independentFinishingModel ? (
+              <>
+                <ModelToggle label="Interior finishing model" value={params.interiorModel} onChange={(v) => set("interiorModel", v)} />
+                <ModelToggle label="Exterior finishing model" value={params.exteriorModel} onChange={(v) => set("exteriorModel", v)} />
+              </>
+            ) : (
+              <ModelToggle label="Finishing model" value={params.interiorModel} onChange={setBothModels} />
+            )}
+            <label className="field checkbox-field">
+              <input
+                type="checkbox"
+                checked={independentFinishingModel}
+                onChange={(e) => {
+                  setIndependentFinishingModel(e.target.checked);
+                  if (!e.target.checked) setBothModels(params.interiorModel);
+                }}
+              />
+              <span>Set interior/exterior finishing models independently</span>
+            </label>
+          </>
+        )}
         <NumberField label="Outer depth" valueMm={params.outerDepth} onChangeMm={(v) => set("outerDepth", v)} unit={unit} />
-        <NumberField label="Inner depth" valueMm={params.innerDepth} onChangeMm={(v) => set("innerDepth", v)} unit={unit} />
+        {!isExteriorOnly && (
+          <NumberField label="Inner depth" valueMm={params.innerDepth} onChangeMm={(v) => set("innerDepth", v)} unit={unit} />
+        )}
         <NumberField label="Bit size" valueMm={params.bitSize} onChangeMm={(v) => set("bitSize", v)} unit={unit} />
         <div className="bit-presets">
           {BIT_PRESETS.map((p) => (
@@ -375,29 +399,41 @@ export function BowlTool({ unit }: { unit: Unit }) {
           warnIfBelowMm={params.bitSize}
           warningText={`Thinner than the bit (${mmToDisplay(params.bitSize, unit)}${unitLabel(unit)}) — the lip may be too narrow to cut cleanly, or at all.`}
         />
-        <NumberField label="Foot height" valueMm={params.footHeight} onChangeMm={(v) => set("footHeight", v)} unit={unit} />
-        <NumberField label="Foot width" valueMm={params.footDiameter} onChangeMm={(v) => set("footDiameter", v)} unit={unit} />
-        <Readout
-          label="Floor thickness"
-          valueMm={floorThickness}
-          unit={unit}
-          warnIfBelowMm={params.bitSize}
-          warningText={
-            floorThickness <= 0
-              ? "Zero or negative — the interior would cut through the bottom of the bowl. Reduce Inner depth or Foot height, or increase Outer depth."
-              : `Thinner than the bit (${mmToDisplay(params.bitSize, unit)}${unitLabel(unit)}) — likely too fragile at the bottom.`
-          }
-        />
-        <label className="field checkbox-field">
-          <input
-            type="checkbox"
-            checked={params.footRelief ?? true}
-            onChange={(e) => set("footRelief", e.target.checked)}
+        {!isInteriorOnly && (
+          <>
+            <NumberField label="Foot height" valueMm={params.footHeight} onChangeMm={(v) => set("footHeight", v)} unit={unit} />
+            <NumberField label="Foot width" valueMm={params.footDiameter} onChangeMm={(v) => set("footDiameter", v)} unit={unit} />
+          </>
+        )}
+        {!isExteriorOnly && (
+          <Readout
+            label="Floor thickness"
+            valueMm={floorThickness}
+            unit={unit}
+            warnIfBelowMm={params.bitSize}
+            warningText={
+              floorThickness <= 0
+                ? isInteriorOnly
+                  ? "Zero or negative — the pocket would cut through the bottom of the stock. Reduce Inner depth or increase Outer depth."
+                  : "Zero or negative — the interior would cut through the bottom of the bowl. Reduce Inner depth or Foot height, or increase Outer depth."
+                : `Thinner than the bit (${mmToDisplay(params.bitSize, unit)}${unitLabel(unit)}) — likely too fragile at the bottom.`
+            }
           />
-          <span>Include foot relief pocket</span>
-        </label>
-        {params.footRelief !== false && (
-          <p className="hint-note">Included automatically in the roughing file when there's room for it.</p>
+        )}
+        {!isInteriorOnly && (
+          <>
+            <label className="field checkbox-field">
+              <input
+                type="checkbox"
+                checked={params.footRelief ?? true}
+                onChange={(e) => set("footRelief", e.target.checked)}
+              />
+              <span>Include foot relief pocket</span>
+            </label>
+            {params.footRelief !== false && (
+              <p className="hint-note">Included automatically in the roughing file when there's room for it.</p>
+            )}
+          </>
         )}
         <label className="field checkbox-field">
           <input
