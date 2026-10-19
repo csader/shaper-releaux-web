@@ -50,7 +50,7 @@ const DEFAULTS: BowlParams = {
   innerDepth: 50,
   footHeight: 2,
   footDiameter: 125,
-  zTouchHeight: 50,
+  zTouchHeight: 60,
   bitSize: 8,
   mmCut: 0.5,
   interiorModel: "circumferential",
@@ -195,8 +195,21 @@ export function BowlTool({ unit }: { unit: Unit }) {
   const [params, setParams] = useState<BowlParams>(DEFAULTS);
   const [independentAxes, setIndependentAxes] = useState(false);
   const [shapeSource, setShapeSource] = useState<ShapeSource>("builtin");
+  // Per the original app's own documentation: "If you aren't using a Z touch
+  // reference block, this value should be the same as for the OuterDepth parameter."
+  // Most bowls don't need the multi-bit workflow, so Z-touch height tracks Outer
+  // depth automatically unless this is on — avoids a stale, silently-wrong value if
+  // Outer depth changes later.
+  const [useZTouchBlock, setUseZTouchBlock] = useState(false);
+  // Most bowls use the same stepping model for both surfaces — one shared control by
+  // default, with an escape hatch for the (new-in-this-version, not in the original
+  // app) per-surface split.
+  const [independentFinishingModel, setIndependentFinishingModel] = useState(false);
   const set = <K extends keyof BowlParams>(key: K, value: BowlParams[K]) =>
     setParams((p) => ({ ...p, [key]: value }));
+  const setBothModels = (v: BowlParams["interiorModel"]) =>
+    setParams((p) => ({ ...p, interiorModel: v, exteriorModel: v }));
+  const effectiveZTouchHeight = useZTouchBlock ? params.zTouchHeight : params.outerDepth;
 
   const supportsIndependentAxes = shapeSource === "builtin" && (params.sides === 1 || params.sides === 4);
   const isCustom = shapeSource === "upload";
@@ -217,12 +230,12 @@ export function BowlTool({ unit }: { unit: Unit }) {
   const files = useMemo(() => {
     if (isCustom && !params.customShape) return [];
     try {
-      return generateBowl(params);
+      return generateBowl({ ...params, zTouchHeight: effectiveZTouchHeight });
     } catch (e) {
       console.error(e);
       return [];
     }
-  }, [params, isCustom]);
+  }, [params, isCustom, effectiveZTouchHeight]);
 
   const exteriorPreview = files.find((f) => f.kind === "exterior");
   const interiorPreview = files.find((f) => f.kind === "interior");
@@ -240,15 +253,6 @@ export function BowlTool({ unit }: { unit: Unit }) {
       <div className="form">
         <div className="shape-source-toggle">
           <button
-            className={shapeSource === "upload" ? "active" : ""}
-            onClick={() => {
-              setShapeSource("upload");
-              set("sides", "custom");
-            }}
-          >
-            Upload SVG
-          </button>
-          <button
             className={shapeSource === "builtin" ? "active" : ""}
             onClick={() => {
               setShapeSource("builtin");
@@ -257,6 +261,15 @@ export function BowlTool({ unit }: { unit: Unit }) {
             }}
           >
             Choose a built-in shape
+          </button>
+          <button
+            className={shapeSource === "upload" ? "active" : ""}
+            onClick={() => {
+              setShapeSource("upload");
+              set("sides", "custom");
+            }}
+          >
+            Upload SVG
           </button>
         </div>
 
@@ -318,8 +331,25 @@ export function BowlTool({ unit }: { unit: Unit }) {
           </label>
         )}
 
-        <ModelToggle label="Interior finishing model" value={params.interiorModel} onChange={(v) => set("interiorModel", v)} />
-        <ModelToggle label="Exterior finishing model" value={params.exteriorModel} onChange={(v) => set("exteriorModel", v)} />
+        {independentFinishingModel ? (
+          <>
+            <ModelToggle label="Interior finishing model" value={params.interiorModel} onChange={(v) => set("interiorModel", v)} />
+            <ModelToggle label="Exterior finishing model" value={params.exteriorModel} onChange={(v) => set("exteriorModel", v)} />
+          </>
+        ) : (
+          <ModelToggle label="Finishing model" value={params.interiorModel} onChange={setBothModels} />
+        )}
+        <label className="field checkbox-field">
+          <input
+            type="checkbox"
+            checked={independentFinishingModel}
+            onChange={(e) => {
+              setIndependentFinishingModel(e.target.checked);
+              if (!e.target.checked) setBothModels(params.interiorModel);
+            }}
+          />
+          <span>Set interior/exterior finishing models independently</span>
+        </label>
         <NumberField label="Outer depth" valueMm={params.outerDepth} onChangeMm={(v) => set("outerDepth", v)} unit={unit} />
         <NumberField label="Inner depth" valueMm={params.innerDepth} onChangeMm={(v) => set("innerDepth", v)} unit={unit} />
         <NumberField label="Bit size" valueMm={params.bitSize} onChangeMm={(v) => set("bitSize", v)} unit={unit} step={0.5} />
@@ -381,7 +411,25 @@ export function BowlTool({ unit }: { unit: Unit }) {
           />
           <span>Include foot relief pocket</span>
         </label>
-        <NumberField label="Z-touch height" valueMm={params.zTouchHeight} onChangeMm={(v) => set("zTouchHeight", v)} unit={unit} />
+        <label className="field checkbox-field">
+          <input
+            type="checkbox"
+            checked={useZTouchBlock}
+            onChange={(e) => {
+              setUseZTouchBlock(e.target.checked);
+              if (e.target.checked) set("zTouchHeight", params.outerDepth);
+            }}
+          />
+          <span>Using a Z-touch reference block (multi-bit deep cut)</span>
+        </label>
+        {useZTouchBlock ? (
+          <NumberField label="Z-touch height" valueMm={params.zTouchHeight} onChangeMm={(v) => set("zTouchHeight", v)} unit={unit} />
+        ) : (
+          <p className="hint-note">
+            Z-touch height tracks Outer depth automatically ({mmToDisplay(effectiveZTouchHeight, unit)} {unitLabel(unit)}) — check
+            the box above only if you're switching cutters partway through a deep bowl.
+          </p>
+        )}
         <NumberField label="MM cut (width of cut paths)" valueMm={params.mmCut} onChangeMm={(v) => set("mmCut", v)} unit={unit} step={0.1} />
         {params.footRelief !== false && (
           <p className="hint-note">
