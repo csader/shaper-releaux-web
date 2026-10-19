@@ -357,7 +357,12 @@ export function BowlTool({ unit }: { unit: Unit }) {
             </label>
           </>
         )}
-        <NumberField label="Outer depth" valueMm={params.outerDepth} onChangeMm={(v) => set("outerDepth", v)} unit={unit} />
+        <NumberField
+          label={isInteriorOnly ? "Stock thickness" : "Outer depth"}
+          valueMm={params.outerDepth}
+          onChangeMm={(v) => set("outerDepth", v)}
+          unit={unit}
+        />
         {!isExteriorOnly && (
           <NumberField label="Inner depth" valueMm={params.innerDepth} onChangeMm={(v) => set("innerDepth", v)} unit={unit} />
         )}
@@ -414,7 +419,7 @@ export function BowlTool({ unit }: { unit: Unit }) {
             warningText={
               floorThickness <= 0
                 ? isInteriorOnly
-                  ? "Zero or negative — the pocket would cut through the bottom of the stock. Reduce Inner depth or increase Outer depth."
+                  ? "Zero or negative — the pocket would cut through the bottom of the stock. Reduce Inner depth or increase Stock thickness."
                   : "Zero or negative — the interior would cut through the bottom of the bowl. Reduce Inner depth or Foot height, or increase Outer depth."
                 : `Thinner than the bit (${mmToDisplay(params.bitSize, unit)}${unitLabel(unit)}) — likely too fragile at the bottom.`
             }
@@ -450,8 +455,9 @@ export function BowlTool({ unit }: { unit: Unit }) {
           <NumberField label="Z-touch height" valueMm={params.zTouchHeight} onChangeMm={(v) => set("zTouchHeight", v)} unit={unit} />
         ) : (
           <p className="hint-note">
-            Z-touch height tracks Outer depth automatically ({mmToDisplay(effectiveZTouchHeight, unit)} {unitLabel(unit)}) — check
-            the box above only if you're switching cutters partway through a deep bowl.
+            Z-touch height tracks {isInteriorOnly ? "Stock thickness" : "Outer depth"} automatically (
+            {mmToDisplay(effectiveZTouchHeight, unit)} {unitLabel(unit)}) — check the box above only if you're switching cutters
+            partway through a deep cut.
           </p>
         )}
         <NumberField label="MM cut (width of cut paths)" valueMm={params.mmCut} onChangeMm={(v) => set("mmCut", v)} unit={unit} />
