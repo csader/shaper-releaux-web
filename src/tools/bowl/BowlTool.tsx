@@ -379,10 +379,15 @@ export function BowlTool({ unit }: { unit: Unit }) {
             </button>
           ))}
         </div>
-        <NumberField label="Outer width" valueMm={params.outerDiameter} onChangeMm={(v) => set("outerDiameter", v)} unit={unit} />
+        <NumberField
+          label={isInteriorOnly ? "Stock width" : "Outer width"}
+          valueMm={params.outerDiameter}
+          onChangeMm={(v) => set("outerDiameter", v)}
+          unit={unit}
+        />
         {independentAxes && (
           <NumberField
-            label="Outer height"
+            label={isInteriorOnly ? "Stock height" : "Outer height"}
             valueMm={params.outerDiameterY ?? params.outerDiameter}
             onChangeMm={(v) => set("outerDiameterY", v)}
             unit={unit}
