@@ -296,7 +296,7 @@ export function BowlTool({ unit }: { unit: Unit }) {
 
         {shapeSource === "builtin" && (
           <label className="field">
-            <span>Number of sides</span>
+            <span>Pre-defined shapes</span>
             <select
               value={params.sides === "custom" ? 5 : params.sides}
               onChange={(e) => {
@@ -313,6 +313,18 @@ export function BowlTool({ unit }: { unit: Unit }) {
             </select>
           </label>
         )}
+
+        <label className="field">
+          <span>Machining</span>
+          <select
+            value={params.machining ?? "two-sided"}
+            onChange={(e) => set("machining", e.target.value as BowlParams["machining"])}
+          >
+            <option value="two-sided">Two-sided (interior + exterior)</option>
+            <option value="interior-only">Interior only</option>
+            <option value="exterior-only">Exterior only</option>
+          </select>
+        </label>
 
         {supportsIndependentAxes && (
           <label className="field checkbox-field">
@@ -411,6 +423,9 @@ export function BowlTool({ unit }: { unit: Unit }) {
           />
           <span>Include foot relief pocket</span>
         </label>
+        {params.footRelief !== false && (
+          <p className="hint-note">Included automatically in the roughing file when there's room for it.</p>
+        )}
         <label className="field checkbox-field">
           <input
             type="checkbox"
@@ -431,19 +446,14 @@ export function BowlTool({ unit }: { unit: Unit }) {
           </p>
         )}
         <NumberField label="MM cut (width of cut paths)" valueMm={params.mmCut} onChangeMm={(v) => set("mmCut", v)} unit={unit} step={0.1} />
-        {params.footRelief !== false && (
-          <p className="hint-note">
-            A foot relief pocket is included automatically in the roughing file when there's room for it.
-          </p>
-        )}
         <IntegerField
           label="Max paths per file"
           value={params.maxPathsPerFile ?? 250}
           onChange={(v) => set("maxPathsPerFile", v)}
         />
         <p className="hint-note">
-          The original app splits a finishing pass into part2/part3/etc. files once its path list gets long — this
-          sets the threshold (an approximation of the original's own, undocumented, rule).
+          Shaper Origin can get slow with too many paths. This breaks a single file into multiple when it gets too
+          large.
         </p>
 
         <label className="field checkbox-field">
@@ -452,7 +462,7 @@ export function BowlTool({ unit }: { unit: Unit }) {
             checked={params.includeBoundingBox ?? false}
             onChange={(e) => set("includeBoundingBox", e.target.checked)}
           />
-          <span>Include bounding-box guide rectangle (matches the original app)</span>
+          <span>Include bounding-box guide rectangle</span>
         </label>
 
         <label className="field checkbox-field">
@@ -461,7 +471,7 @@ export function BowlTool({ unit }: { unit: Unit }) {
             checked={params.anchor?.enabled ?? false}
             onChange={(e) => set("anchor", { ...(params.anchor ?? DEFAULT_ANCHOR), enabled: e.target.checked })}
           />
-          <span>Add a custom anchor marker (Shaper Origin registration point)</span>
+          <span>Add custom anchor point</span>
         </label>
 
         {params.anchor?.enabled && (

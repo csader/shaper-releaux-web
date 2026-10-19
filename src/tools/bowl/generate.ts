@@ -51,6 +51,9 @@ export interface BowlParams {
    * gets long (confirmed via real sample output) — the exact threshold it uses isn't
    * documented, so this is an approximation, exposed here so it can be tuned. */
   maxPathsPerFile?: number;
+  /** Which surface(s) to generate files for. Defaults to "two-sided" (both), matching
+   * the original app's always-both behavior. */
+  machining?: "two-sided" | "interior-only" | "exterior-only";
 }
 
 const ROUGH_Z_STEP = 4; // mm, per the vertical model used for all roughing passes
@@ -128,6 +131,7 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
     anchor,
     includeBoundingBox = false,
     maxPathsPerFile = 250,
+    machining = "two-sided",
   } = params;
 
   if (sides === "custom" && !customShape) {
@@ -319,10 +323,17 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
   // Matches the original app documentation's own "Order Of Operations": interior
   // roughing, interior finishing, flip the wood over, exterior roughing, exterior
   // finishing — carving the interior first, while the stock is still fully intact.
-  addSplit(1, "Interior Roughing", "interior-roughing", interiorRoughPaths);
-  addSplit(2, "Interior", "interior", interiorPaths);
-  addSplit(3, "Exterior Roughing", "exterior-roughing", exteriorRoughPaths);
-  addSplit(4, "Exterior", "exterior", exteriorPaths);
+  // Step numbers restart from 1 when only one surface is generated, rather than
+  // jumping straight to 3/4, so a single-surface run still reads as "1, 2".
+  let step = 0;
+  if (machining !== "exterior-only") {
+    addSplit(++step, "Interior Roughing", "interior-roughing", interiorRoughPaths);
+    addSplit(++step, "Interior", "interior", interiorPaths);
+  }
+  if (machining !== "interior-only") {
+    addSplit(++step, "Exterior Roughing", "exterior-roughing", exteriorRoughPaths);
+    addSplit(++step, "Exterior", "exterior", exteriorPaths);
+  }
 
   return files;
 }

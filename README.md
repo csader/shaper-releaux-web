@@ -23,6 +23,7 @@ Capabilities that don't exist in the original Windows app:
 - **Optional Shaper Origin custom anchor marker** — a registration-point triangle (per [Shaper's custom anchor spec](https://support.shapertools.com/hc/en-us/articles/4402965445019-custom-anchors)) placed via a 9-point grid or a draggable custom position, baked identically into every generated file so the same physical mark registers all four passes
 - **Bounding-box guide rectangle toggle** — off by default; the original app always includes this (invisible, zero-width-stroke) rect, this version makes it optional
 - **Descriptive, numbered file names** — `Step 1 - Interior Roughing - Pentagon.svg`, `Step 2 - Interior - Pentagon.svg`, etc. (the original always used the fixed names `ReuleauxInteriorRoughing.svg`/`ReuleauxInterior.svg`/`ReuleauxExteriorRoughing.svg`/`ReuleauxExterior.svg`). The step numbers follow the original documentation's own "Order Of Operations" (interior roughing → interior → flip the wood → exterior roughing → exterior), and the shape name is the built-in shape (e.g. "Pentagon") or the uploaded file's own name for a custom shape
+- **Machining mode** — generate both surfaces (the original's only option), or just interior/exterior only, for pieces that don't need the full two-sided carve
 - Live in-browser SVG preview and zip download — the original is a text-prompt CLI tool with no preview, and runs only on Windows
 
 ### Wave / Ripple Generator — new in this version
