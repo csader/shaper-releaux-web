@@ -146,6 +146,12 @@ header h1 {
   border-radius: 4px;
 }
 
+/* Incomplete/unparseable dimension expression (e.g. mid-typing "15 + ") — shown while
+   typing, not blocked; reverts to the last valid value on blur. */
+.field input.invalid {
+  border-color: #ff6b6b;
+}
+
 .license-note,
 .hint-note {
   font-size: 0.75rem;

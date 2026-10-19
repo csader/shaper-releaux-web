@@ -18,6 +18,7 @@ Capabilities that don't exist in the original Windows app:
 - **Radial stepping as a selectable alternative** to circumferential, per surface (the original app only ever produces circumferential output)
 - **Foot relief pocket on/off toggle** (the original always includes it when there's room)
 - **mm/in input toggle** (exported files are still always mm, matching the original's metric-only convention — not a Shaper Origin limitation, its cutDepth encoding supports both units)
+- **Dimension fields accept expressions**, not just plain numbers — explicit unit suffixes (`mm`, `cm`, `m`, `in`, `ft`) override the field's current mm/in toggle, and `+ - * /` with parentheses are supported, e.g. `15mm + (3/4*4)in`
 - **Floor thickness / lip width safety readouts** that warn when a combination of depths would leave the wall or floor thinner than the current bit size (or cut through entirely)
 - **Common bit size presets** (1/8", 1/4", 1/2", 3/6/8/16mm) alongside free-form entry
 - **Optional Shaper Origin custom anchor marker** — a registration-point triangle (per [Shaper's custom anchor spec](https://support.shapertools.com/hc/en-us/articles/4402965445019-custom-anchors)) placed via a 9-point grid or a draggable custom position, baked identically into every generated file so the same physical mark registers all four passes

@@ -4,9 +4,10 @@ import { CustomShapeImport } from "./CustomShapeImport";
 import type { Sides } from "../../geometry/shapes";
 import type { SteppingModel } from "../../geometry/profile";
 import { downloadAllAsZip, downloadFile } from "../../download/download";
-import { displayToMm, mmToDisplay, unitLabel, type Unit } from "../../units";
+import { mmToDisplay, unitLabel, type Unit } from "../../units";
 import { shadePreviewSvg } from "../../svg/previewShading";
 import { resolveAnchorPoint, type AnchorConfig, type AnchorPosition, type BoundingBox } from "../../svg/anchor";
+import { NumberField } from "../../components/NumberField";
 
 const SIDE_LABELS: Record<Sides, string> = {
   1: "1 — Circle / Ellipse",
@@ -59,34 +60,6 @@ const DEFAULTS: BowlParams = {
   maxPathsPerFile: 250,
   anchor: DEFAULT_ANCHOR,
 };
-
-function NumberField({
-  label,
-  valueMm,
-  onChangeMm,
-  unit,
-  step = 1,
-}: {
-  label: string;
-  valueMm: number;
-  onChangeMm: (mm: number) => void;
-  unit: Unit;
-  step?: number;
-}) {
-  return (
-    <label className="field">
-      <span>
-        {label} ({unitLabel(unit)})
-      </span>
-      <input
-        type="number"
-        step={step}
-        value={mmToDisplay(valueMm, unit)}
-        onChange={(e) => onChangeMm(displayToMm(parseFloat(e.target.value) || 0, unit))}
-      />
-    </label>
-  );
-}
 
 /** Plain integer input, no unit conversion — e.g. a path count, not a physical size. */
 function IntegerField({
@@ -364,7 +337,7 @@ export function BowlTool({ unit }: { unit: Unit }) {
         </label>
         <NumberField label="Outer depth" valueMm={params.outerDepth} onChangeMm={(v) => set("outerDepth", v)} unit={unit} />
         <NumberField label="Inner depth" valueMm={params.innerDepth} onChangeMm={(v) => set("innerDepth", v)} unit={unit} />
-        <NumberField label="Bit size" valueMm={params.bitSize} onChangeMm={(v) => set("bitSize", v)} unit={unit} step={0.5} />
+        <NumberField label="Bit size" valueMm={params.bitSize} onChangeMm={(v) => set("bitSize", v)} unit={unit} />
         <div className="bit-presets">
           {BIT_PRESETS.map((p) => (
             <button
@@ -445,7 +418,7 @@ export function BowlTool({ unit }: { unit: Unit }) {
             the box above only if you're switching cutters partway through a deep bowl.
           </p>
         )}
-        <NumberField label="MM cut (width of cut paths)" valueMm={params.mmCut} onChangeMm={(v) => set("mmCut", v)} unit={unit} step={0.1} />
+        <NumberField label="MM cut (width of cut paths)" valueMm={params.mmCut} onChangeMm={(v) => set("mmCut", v)} unit={unit} />
         <IntegerField
           label="Max paths per file"
           value={params.maxPathsPerFile ?? 250}
