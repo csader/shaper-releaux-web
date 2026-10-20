@@ -79,7 +79,7 @@ export function exteriorProfile(
   });
 }
 
-export type SteppingModel = "radial" | "circumferential";
+export type SteppingModel = "radial" | "circumferential" | "hybrid";
 
 /** Numerical derivative of a profile curve at θ, in units per degree. */
 function speedPerDegree(curve: ProfileCurve, theta: number): number {
@@ -112,7 +112,16 @@ function arcLength(curve: ProfileCurve, thetaA: number, thetaB: number, samples 
  *    simpler, documented "radial model" (equal-degree steps).
  *  - "circumferential": adaptively solves for Δθ so the true arc length between
  *    consecutive rings is ≈ mmCut at every step — "the standard model for all
- *    finishing cut SVGs" per the author, and the default here.
+ *    finishing cut SVGs" per the author.
+ *  - "hybrid" (default): circumferential, but each step is floored at the fixed
+ *    radial step size. Near θ=0 the profile is nearly flat (dZ/dθ≈0 — see
+ *    interiorDepth/exteriorDepth), so for a wide, shallow shape circumferential's
+ *    adaptive step can get very small there relative to the radial step, producing a
+ *    dense cluster of near-identical rings for little visible benefit (the actual
+ *    motivating case: a ~135mm-wide, ~13mm-deep interior pocket). Circumferential's
+ *    adaptive step only ever grows as θ increases, so there's a single, well-defined
+ *    crossover point past which it already exceeds the radial floor — the two models
+ *    are identical beyond that point, with no threshold to tune.
  */
 export function stepAngles(
   thetaStart: number,
@@ -123,9 +132,10 @@ export function stepAngles(
 ): number[] {
   if (thetaEnd <= thetaStart) return [thetaStart];
 
+  const lipSpeed = speedPerDegree(curve, thetaEnd);
+  const fixedStep = Math.max(mmCut / lipSpeed, 0.01);
+
   if (model === "radial") {
-    const lipSpeed = speedPerDegree(curve, thetaEnd);
-    const fixedStep = Math.max(mmCut / lipSpeed, 0.01);
     const thetas: number[] = [];
     let theta = thetaStart;
     while (theta < thetaEnd) {
@@ -136,7 +146,8 @@ export function stepAngles(
     return thetas;
   }
 
-  // Circumferential: adaptive Newton-ish search for Δθ giving arcLength ≈ mmCut.
+  // Circumferential (and hybrid): adaptive Newton-ish search for Δθ giving
+  // arcLength ≈ mmCut; hybrid additionally floors each resulting step at fixedStep.
   const thetas: number[] = [thetaStart];
   let theta = thetaStart;
   while (theta < thetaEnd) {
@@ -149,6 +160,7 @@ export function stepAngles(
       if (actual < 1e-9) break;
       step *= mmCut / actual;
     }
+    if (model === "hybrid") step = Math.max(step, fixedStep);
     theta = Math.min(theta + step, thetaEnd);
     thetas.push(theta);
   }
