@@ -338,8 +338,16 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
   return files;
 }
 
+/** Rounds a cutDepthMm value, nudging an exact 0 to a vanishingly small negative
+ * number first. Shaper Origin may treat a literal "0mm" cutDepth as unset and fall
+ * back to whatever depth is currently dialed into the tool rather than actually
+ * cutting to the surface — a tiny negative value is still a real (if imperceptible)
+ * cut below the surface, so it can never be mistaken for "no depth given". Positive
+ * would be wrong here: in this encoding more-negative means deeper, so a positive
+ * nudge would mean "above the surface", i.e. don't cut at all. */
 function round(n: number): number {
-  return Math.round(n * 1e4) / 1e4;
+  const rounded = Math.round(n * 1e4) / 1e4;
+  return rounded === 0 ? -0.001 : rounded;
 }
 
 function ceilToStep(v: number, step: number): number {
