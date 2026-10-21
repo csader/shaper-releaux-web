@@ -39,6 +39,8 @@ Not part of Reuleaux.exe at all. The original author documented a related but se
 
 Not part of Reuleaux.exe at all. The original author's documentation also includes "Chord calculations" for straight decorative grooves/flutes (e.g. fluted door staves) — a Pythagorean formula for the groove's depth profile, separate from both the bowl's elliptical cross-section and the wave technique's sine-based math. This turns that formula into a generator: a groove is modeled as a circular arc in cross-section (the radius is computed from the groove's width and center depth) and cut as a stack of parallel full-length passes stepped across the groove's width, each at the depth the arc calls for at that offset. Supports a single groove or multiple evenly-spaced parallel flutes, and shows the groove's computed radius of curvature as a readout (a round-nose/core-box bit of that radius would cut the same groove in one pass instead of many stepped ones).
 
+Toggle between **Concave** (a dish-shaped groove cut into the surface — fluting) and **Convex** (a raised rounded bead, left standing by cutting down on either side — reeding), the same circular cross-section read the opposite way. For continuous reeding with no flat between adjacent beads, set the flute pitch equal to the groove width.
+
 ## Getting started
 
 ```bash

@@ -7,6 +7,7 @@ import { mmToDisplay, unitLabel } from "../../units";
 import { NumberField } from "../../components/NumberField";
 
 const DEFAULTS: ChordParams = {
+  profile: "concave",
   grooveWidthMm: 58,
   grooveDepthMm: 9.5,
   lengthMm: 300,
@@ -39,9 +40,17 @@ export function ChordTool({ unit }: { unit: Unit }) {
           Technique by Andrew Weighill-Richards, licensed CC BY-NC-SA 4.0 (noncommercial, attribution, share-alike).
         </p>
         <p className="hint-note">
-          A straight decorative groove (e.g. a fluted door stave), cut as a stack of parallel passes stepped across
-          the groove's width, each at the depth its circular cross-section calls for at that offset.
+          A straight decorative groove, cut as a stack of parallel passes stepped across the groove's width, each at
+          the depth its circular cross-section calls for at that offset.
         </p>
+        <div className="shape-source-toggle">
+          <button className={params.profile === "concave" ? "active" : ""} onClick={() => set("profile", "concave")}>
+            Concave (dish — fluting, cut into the surface)
+          </button>
+          <button className={params.profile === "convex" ? "active" : ""} onClick={() => set("profile", "convex")}>
+            Convex (arch — reeding, a raised rounded bead)
+          </button>
+        </div>
         <NumberField
           label="Groove width (chord)"
           valueMm={params.grooveWidthMm}
@@ -49,7 +58,7 @@ export function ChordTool({ unit }: { unit: Unit }) {
           unit={unit}
         />
         <NumberField
-          label="Groove depth (at centerline)"
+          label={params.profile === "concave" ? "Groove depth (at centerline)" : "Bead height (depth cut at the edges)"}
           valueMm={params.grooveDepthMm}
           onChangeMm={(v) => set("grooveDepthMm", v)}
           unit={unit}
@@ -82,12 +91,20 @@ export function ChordTool({ unit }: { unit: Unit }) {
           />
         </label>
         {params.fluteCount > 1 && (
-          <NumberField
-            label="Flute pitch (center-to-center)"
-            valueMm={params.flutePitchMm}
-            onChangeMm={(v) => set("flutePitchMm", v)}
-            unit={unit}
-          />
+          <>
+            <NumberField
+              label="Flute pitch (center-to-center)"
+              valueMm={params.flutePitchMm}
+              onChangeMm={(v) => set("flutePitchMm", v)}
+              unit={unit}
+            />
+            {params.profile === "convex" && (
+              <p className="hint-note">
+                For continuous reeding with no flat between beads, set pitch equal to groove width — each bead then
+                reaches full depth right where the next one starts.
+              </p>
+            )}
+          </>
         )}
         <NumberField label="Bit size" valueMm={params.bitSize} onChangeMm={(v) => set("bitSize", v)} unit={unit} />
       </div>

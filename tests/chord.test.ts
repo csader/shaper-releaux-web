@@ -32,3 +32,33 @@ describe("chordDepthAt", () => {
     expect(chordDepthAt(30, 29, 9.5)).toBe(0);
   });
 });
+
+describe("chordDepthAt (convex profile — reeding, the complement of concave fluting)", () => {
+  it("is zero at the centerline (the bead's uncut peak)", () => {
+    expect(chordDepthAt(0, 29, 9.5, "convex")).toBeCloseTo(0, 6);
+  });
+
+  it("equals the full depth at both surface edges", () => {
+    expect(chordDepthAt(29, 29, 9.5, "convex")).toBeCloseTo(9.5, 6);
+    expect(chordDepthAt(-29, 29, 9.5, "convex")).toBeCloseTo(9.5, 6);
+  });
+
+  it("is symmetric about the centerline", () => {
+    expect(chordDepthAt(10, 29, 9.5, "convex")).toBeCloseTo(chordDepthAt(-10, 29, 9.5, "convex"), 10);
+  });
+
+  it("increases monotonically from center to edge (opposite of concave)", () => {
+    const samples = [0, 5, 10, 15, 20, 25, 29].map((x) => chordDepthAt(x, 29, 9.5, "convex"));
+    for (let i = 1; i < samples.length; i++) {
+      expect(samples[i]).toBeGreaterThan(samples[i - 1]);
+    }
+  });
+
+  it("is the exact complement of concave at every offset (concave + convex = full depth)", () => {
+    for (const x of [0, 5, 12, 20, 29]) {
+      const concave = chordDepthAt(x, 29, 9.5, "concave");
+      const convex = chordDepthAt(x, 29, 9.5, "convex");
+      expect(concave + convex).toBeCloseTo(9.5, 6);
+    }
+  });
+});

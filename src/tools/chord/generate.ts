@@ -8,11 +8,14 @@
 import { buildShaperSvg, type CutPath } from "../../svg/shaperSvg";
 import { splitIntoChunks } from "../../svg/fileSplit";
 import type { GeneratedFile } from "../../types";
-import { chordDepthAt, chordRadius } from "../../geometry/chord";
+import { chordDepthAt, chordRadius, type ChordProfile } from "../../geometry/chord";
 
 const round = (n: number) => Math.round(n * 1e4) / 1e4;
 
 export interface ChordParams {
+  /** Concave (dish/fluting — cut into the surface) or convex (arch/reeding — a raised
+   * rounded bead) — see geometry/chord.ts for the depth-formula relationship. */
+  profile: ChordProfile;
   /** Surface width of each groove (the "chord" — 2W in the reference formula). */
   grooveWidthMm: number;
   /** Depth at the groove's centerline (Z in the reference formula). */
@@ -44,8 +47,11 @@ function flutePasses(fluteIndex: number, centerX: number, p: ChordParams): CutPa
   const paths: CutPath[] = [];
   for (let i = 0; i <= steps; i++) {
     const offset = -halfWidth + (p.grooveWidthMm * i) / steps;
-    const depth = chordDepthAt(offset, halfWidth, p.grooveDepthMm);
-    if (depth <= 0) continue; // at/past the groove's edge — no material removed here
+    const depth = chordDepthAt(offset, halfWidth, p.grooveDepthMm, p.profile);
+    // Concave: skipped at the groove's edges (no material removed there). Convex:
+    // skipped at the centerline (the peak, left uncut) — same "no-op pass" guard,
+    // just at the opposite end of the sweep.
+    if (depth <= 0) continue;
     paths.push(verticalLineCutPath(`f${fluteIndex}-${i}`, centerX + offset, 0, p.lengthMm, depth, p.bitSize));
   }
   return paths;
@@ -62,6 +68,7 @@ export function generateChord(params: ChordParams): GeneratedFile[] {
   }
 
   const comments: Record<string, string | number> = {
+    Profile: params.profile,
     "Groove Width": params.grooveWidthMm,
     "Groove Depth": params.grooveDepthMm,
     Length: params.lengthMm,

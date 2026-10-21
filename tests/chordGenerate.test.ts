@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { generateChord, type ChordParams } from "../src/tools/chord/generate";
 
 const baseParams: ChordParams = {
+  profile: "concave",
   grooveWidthMm: 58,
   grooveDepthMm: 9.5,
   lengthMm: 300,
@@ -60,5 +61,20 @@ describe("generateChord", () => {
     const manyPasses = generateChord({ ...baseParams, grooveWidthMm: 200, stepMm: 0.5 });
     expect(manyPasses.length).toBeGreaterThan(1);
     expect(manyPasses[0].name).toBe("Chord-part1.svg");
+  });
+
+  it("convex profile puts its deepest passes at the edges, not the centerline", () => {
+    const files = generateChord({ ...baseParams, profile: "convex" });
+    const paths = parsePaths(files[0].content);
+    expect(paths.length).toBeGreaterThan(10);
+    // The centerline pass (depth ~0) should have been skipped as a no-op, same as the
+    // edge passes are skipped for concave.
+    for (const p of paths) {
+      expect(p.depth).toBeGreaterThan(0);
+      expect(p.depth).toBeLessThanOrEqual(baseParams.grooveDepthMm + 1e-6);
+    }
+    const first = paths[0].depth;
+    const middle = paths[Math.floor(paths.length / 2)].depth;
+    expect(first).toBeGreaterThan(middle);
   });
 });
