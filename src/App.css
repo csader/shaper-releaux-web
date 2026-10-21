@@ -327,7 +327,8 @@ header h1 {
   border-color: #4a6cf7;
 }
 
-.anchor-picker {
+.anchor-picker,
+.profile-mode-section {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -416,4 +417,48 @@ header h1 {
 .scale-preview-item svg {
   background: #fff;
   border-radius: 4px;
+}
+
+.profile-curve-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.profile-curve-svg {
+  width: 100%;
+  max-width: 320px;
+  background: #1a1a1f;
+  border: 1px solid #3c3c44;
+  border-radius: 6px;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.profile-curve-bg {
+  fill: #222228;
+  stroke: #3c3c44;
+  stroke-width: 1;
+}
+
+.profile-curve-path {
+  fill: none;
+  stroke: #4a6cf7;
+  stroke-width: 2;
+}
+
+.profile-curve-point {
+  fill: #e8e8ea;
+  stroke: #4a6cf7;
+  stroke-width: 2;
+  cursor: grab;
+}
+
+.profile-curve-point:active {
+  cursor: grabbing;
+}
+
+.profile-curve-axis-label {
+  fill: #9a9aa2;
+  font-size: 9px;
 }

@@ -26,6 +26,7 @@ Capabilities that don't exist in the original Windows app:
 - **Bounding-box guide rectangle toggle** — off by default; the original app always includes this (invisible, zero-width-stroke) rect, this version makes it optional
 - **Descriptive, numbered file names** — `Step 1 - Interior Roughing - Pentagon.svg`, `Step 2 - Interior - Pentagon.svg`, etc. (the original always used the fixed names `ReuleauxInteriorRoughing.svg`/`ReuleauxInterior.svg`/`ReuleauxExteriorRoughing.svg`/`ReuleauxExterior.svg`). The step numbers follow the original documentation's own "Order Of Operations" (interior roughing → interior → flip the wood → exterior roughing → exterior), and the shape name is the built-in shape (e.g. "Pentagon") or the uploaded file's own name for a custom shape
 - **Machining mode** — generate both surfaces (the original's only option), or just interior/exterior only, for pieces that don't need the full two-sided carve
+- **Custom profile curves** — draw the cross-section (depth vs. radius) by hand, pen-tool style, as an alternative to the original's fixed elliptical shape, independently for interior and/or exterior. For exterior specifically, this makes the foot optional — the curve itself defines everything from its own starting point out to the rim, with no separate foot height/diameter or relief pocket
 - Live in-browser SVG preview and zip download — the original is a text-prompt CLI tool with no preview, and runs only on Windows
 
 ### Wave / Ripple Generator — new in this version

@@ -8,6 +8,8 @@ import { mmToDisplay, unitLabel, type Unit } from "../../units";
 import { shadePreviewSvg } from "../../svg/previewShading";
 import { resolveAnchorPoint, type AnchorConfig, type AnchorPosition, type BoundingBox } from "../../svg/anchor";
 import { NumberField } from "../../components/NumberField";
+import { ProfileCurveEditor } from "../../components/ProfileCurveEditor";
+import type { CustomProfile } from "../../geometry/customProfile";
 
 const SIDE_LABELS: Record<Sides, string> = {
   1: "1 — Circle / Ellipse",
@@ -42,6 +44,24 @@ const ANCHOR_GRID: { position: AnchorPosition; label: string }[] = [
 ];
 
 const DEFAULT_ANCHOR: AnchorConfig = { enabled: true, position: "center" };
+
+// Starting points for a custom profile, roughly tracing the default parametric
+// ellipse — interior goes deep-to-shallow (center to rim), exterior shallow-to-deep
+// (foot to rim), matching each surface's natural direction.
+const DEFAULT_INTERIOR_PROFILE: CustomProfile = {
+  points: [
+    { r: 0, z: 1 },
+    { r: 0.5, z: 0.5 },
+    { r: 1, z: 0 },
+  ],
+};
+const DEFAULT_EXTERIOR_PROFILE: CustomProfile = {
+  points: [
+    { r: 0, z: 0 },
+    { r: 0.5, z: 0.5 },
+    { r: 1, z: 1 },
+  ],
+};
 
 const DEFAULTS: BowlParams = {
   sides: 5,
@@ -179,6 +199,14 @@ export function BowlTool({ unit }: { unit: Unit }) {
   // default, with an escape hatch for the (new-in-this-version, not in the original
   // app) per-surface split.
   const [independentFinishingModel, setIndependentFinishingModel] = useState(false);
+  // Kept as separate local state (not folded directly into `params`) so switching
+  // back to Parametric doesn't discard a drawn curve — only merged into the params
+  // actually sent to generateBowl (below) when its mode is "custom".
+  const [interiorProfileMode, setInteriorProfileMode] = useState<"parametric" | "custom">("parametric");
+  const [exteriorProfileMode, setExteriorProfileMode] = useState<"parametric" | "custom">("parametric");
+  const [interiorProfile, setInteriorProfile] = useState<CustomProfile>(DEFAULT_INTERIOR_PROFILE);
+  const [exteriorProfile, setExteriorProfile] = useState<CustomProfile>(DEFAULT_EXTERIOR_PROFILE);
+  const isExteriorCustomProfile = exteriorProfileMode === "custom";
   const set = <K extends keyof BowlParams>(key: K, value: BowlParams[K]) =>
     setParams((p) => ({ ...p, [key]: value }));
   const setBothModels = (v: BowlParams["interiorModel"]) =>
@@ -205,7 +233,8 @@ export function BowlTool({ unit }: { unit: Unit }) {
   const lipWidth = (params.outerDiameter - params.innerDiameter) / 2;
   // Foot height only factors in when an exterior/foot is actually part of this job —
   // for a standalone pocket/tray there's no foot being carved out from below.
-  const floorThickness = params.outerDepth - params.innerDepth - (isInteriorOnly ? 0 : params.footHeight);
+  const floorThickness =
+    params.outerDepth - params.innerDepth - (isInteriorOnly || isExteriorCustomProfile ? 0 : params.footHeight);
 
   const boundingBox = boundingBoxFor(params);
   const shapeCenter = shapeCenterFor(params);
@@ -216,12 +245,17 @@ export function BowlTool({ unit }: { unit: Unit }) {
   const files = useMemo(() => {
     if (isCustom && !params.customShape) return [];
     try {
-      return generateBowl({ ...params, zTouchHeight: effectiveZTouchHeight });
+      return generateBowl({
+        ...params,
+        zTouchHeight: effectiveZTouchHeight,
+        customInteriorProfile: interiorProfileMode === "custom" ? interiorProfile : undefined,
+        customExteriorProfile: exteriorProfileMode === "custom" ? exteriorProfile : undefined,
+      });
     } catch (e) {
       console.error(e);
       return [];
     }
-  }, [params, isCustom, effectiveZTouchHeight]);
+  }, [params, isCustom, effectiveZTouchHeight, interiorProfileMode, exteriorProfileMode, interiorProfile, exteriorProfile]);
 
   const exteriorPreview = files.find((f) => f.kind === "exterior");
   const interiorPreview = files.find((f) => f.kind === "interior");
@@ -299,6 +333,59 @@ export function BowlTool({ unit }: { unit: Unit }) {
             </select>
           </label>
         )}
+
+        <div className="profile-mode-section">
+          {!isExteriorOnly && (
+            <>
+              <label className="field">
+                <span>Interior profile</span>
+                <select
+                  value={interiorProfileMode}
+                  onChange={(e) => setInteriorProfileMode(e.target.value as "parametric" | "custom")}
+                >
+                  <option value="parametric">Parametric (default)</option>
+                  <option value="custom">Custom curve</option>
+                </select>
+              </label>
+              {interiorProfileMode === "custom" && (
+                <ProfileCurveEditor
+                  profile={interiorProfile}
+                  onChange={setInteriorProfile}
+                  startLabel="Center"
+                  endLabel="Rim"
+                />
+              )}
+            </>
+          )}
+          {!isInteriorOnly && (
+            <>
+              <label className="field">
+                <span>Exterior profile</span>
+                <select
+                  value={exteriorProfileMode}
+                  onChange={(e) => setExteriorProfileMode(e.target.value as "parametric" | "custom")}
+                >
+                  <option value="parametric">Parametric (default)</option>
+                  <option value="custom">Custom curve</option>
+                </select>
+              </label>
+              {exteriorProfileMode === "custom" && (
+                <>
+                  <ProfileCurveEditor
+                    profile={exteriorProfile}
+                    onChange={setExteriorProfile}
+                    startLabel="Foot"
+                    endLabel="Rim"
+                  />
+                  <p className="hint-note">
+                    A custom exterior curve replaces the foot entirely — draw whatever taper (or none) you want
+                    near the start. Foot height/width and the relief pocket don't apply here.
+                  </p>
+                </>
+              )}
+            </>
+          )}
+        </div>
 
         <label className="field">
           <span>Machining</span>
@@ -410,7 +497,7 @@ export function BowlTool({ unit }: { unit: Unit }) {
           warnIfBelowMm={params.bitSize}
           warningText={`Thinner than the bit (${mmToDisplay(params.bitSize, unit)}${unitLabel(unit)}) — the lip may be too narrow to cut cleanly, or at all.`}
         />
-        {!isInteriorOnly && (
+        {!isInteriorOnly && !isExteriorCustomProfile && (
           <>
             <NumberField label="Foot height" valueMm={params.footHeight} onChangeMm={(v) => set("footHeight", v)} unit={unit} />
             <NumberField label="Foot width" valueMm={params.footDiameter} onChangeMm={(v) => set("footDiameter", v)} unit={unit} />
@@ -424,14 +511,12 @@ export function BowlTool({ unit }: { unit: Unit }) {
             warnIfBelowMm={params.bitSize}
             warningText={
               floorThickness <= 0
-                ? isInteriorOnly
-                  ? "Zero or negative — the pocket would cut through the bottom of the stock. Reduce Inner depth or increase Stock thickness."
-                  : "Zero or negative — the interior would cut through the bottom of the bowl. Reduce Inner depth or Foot height, or increase Outer depth."
+                ? `Zero or negative — the ${isInteriorOnly ? "pocket would cut through the bottom of the stock" : "interior would cut through the bottom of the bowl"}. Reduce Inner depth${isInteriorOnly || isExteriorCustomProfile ? "" : " or Foot height"}, or increase ${isInteriorOnly ? "Stock thickness" : "Outer depth"}.`
                 : `Thinner than the bit (${mmToDisplay(params.bitSize, unit)}${unitLabel(unit)}) — likely too fragile at the bottom.`
             }
           />
         )}
-        {!isInteriorOnly && (
+        {!isInteriorOnly && !isExteriorCustomProfile && (
           <>
             <label className="field checkbox-field">
               <input

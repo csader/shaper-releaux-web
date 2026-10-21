@@ -5,8 +5,10 @@ import {
   interiorDepth,
   interiorDiameter,
   stepAngles,
+  type ProfileCurve,
   type SteppingModel,
 } from "../../geometry/profile";
+import { toProfileCurve, type CustomProfile } from "../../geometry/customProfile";
 import { solveThetaForDepth } from "../../geometry/invert";
 import { shapeOutline, type Sides } from "../../geometry/shapes";
 import { oddCircumradius } from "../../geometry/reuleauxPolygon";
@@ -54,6 +56,13 @@ export interface BowlParams {
   /** Which surface(s) to generate files for. Defaults to "two-sided" (both), matching
    * the original app's always-both behavior. */
   machining?: "two-sided" | "interior-only" | "exterior-only";
+  /** Replaces the parametric elliptical profile for that surface with a hand-drawn
+   * curve (see geometry/customProfile.ts), when present. For exterior specifically,
+   * this also makes the foot optional — footHeight/footDiameter and the relief pocket
+   * are ignored, since there's no separate foot concept once the curve itself defines
+   * everything from its own starting point (whatever that is) out to the rim. */
+  customInteriorProfile?: CustomProfile;
+  customExteriorProfile?: CustomProfile;
 }
 
 const ROUGH_Z_STEP = 4; // mm, per the vertical model used for all roughing passes
@@ -132,6 +141,8 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
     includeBoundingBox = false,
     maxPathsPerFile = 250,
     machining = "two-sided",
+    customInteriorProfile,
+    customExteriorProfile,
   } = params;
 
   if (sides === "custom" && !customShape) {
@@ -139,6 +150,9 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
   }
 
   const footAngle = footAngleDeg(outerDiameter, footDiameter);
+  // A custom exterior curve has no separate foot concept — it starts wherever its
+  // first drawn point is, not at a formula-derived foot angle.
+  const exteriorStart = customExteriorProfile ? 0 : footAngle;
   const box = boundingBoxFor(params);
   const boundingWidth = box.width;
   const boundingHeight = box.height;
@@ -181,52 +195,55 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
     "Inner Diameter": innerDiameter,
     "Outer Depth": outerDepth,
     "Inner Depth": innerDepth,
-    "Foot Height": footHeight,
-    "Foot Diameter": footDiameter,
+    // No separate foot concept once the exterior is a hand-drawn curve.
+    ...(customExteriorProfile ? {} : { "Foot Height": footHeight, "Foot Diameter": footDiameter }),
     "Z Touch Height": zTouchHeight,
     "Bit Size": bitSize,
     "MM Cut": mmCut,
   };
 
-  const exteriorCurve = (theta: number) => ({
-    R: exteriorDiameter(theta, outerDiameter),
-    Z: exteriorDepth(theta, { outerDepth, footHeight, zTouchHeight }, footAngle),
-  });
-  const interiorCurve = (theta: number) => ({
-    R: interiorDiameter(theta, innerDiameter),
-    Z: interiorDepth(theta, innerDepth, outerDepth, zTouchHeight),
-  });
+  // Same (outerDepth − zTouchHeight) reference the parametric formulas already
+  // subtract — a custom profile responds to the Z-touch-height setting identically.
+  const offset = outerDepth - zTouchHeight;
+  const exteriorCurve: ProfileCurve = customExteriorProfile
+    ? toProfileCurve(customExteriorProfile, outerDiameter, outerDepth, offset)
+    : (theta) => ({
+        R: exteriorDiameter(theta, outerDiameter),
+        Z: exteriorDepth(theta, { outerDepth, footHeight, zTouchHeight }, footAngle),
+      });
+  const interiorCurve: ProfileCurve = customInteriorProfile
+    ? toProfileCurve(customInteriorProfile, innerDiameter, innerDepth, offset)
+    : (theta) => ({
+        R: interiorDiameter(theta, innerDiameter),
+        Z: interiorDepth(theta, innerDepth, outerDepth, zTouchHeight),
+      });
+  const exteriorD = (theta: number) => exteriorCurve(theta).R;
+  const exteriorZ = (theta: number) => exteriorCurve(theta).Z;
+  const interiorD = (theta: number) => interiorCurve(theta).R;
+  const interiorZ = (theta: number) => interiorCurve(theta).Z;
 
   // --- Finishing passes --------------------------------------------------
-  const exteriorThetas = stepAngles(footAngle, 90, mmCut, exteriorModel, exteriorCurve).filter(
-    (t) => exteriorDiameter(t, outerDiameter) >= minCuttable,
+  const exteriorThetas = stepAngles(exteriorStart, 90, mmCut, exteriorModel, exteriorCurve).filter(
+    (t) => exteriorD(t) >= minCuttable,
   );
-  const exteriorPaths: CutPath[] = exteriorThetas.map((theta) => {
-    const D = exteriorDiameter(theta, outerDiameter);
-    const Z = exteriorDepth(theta, { outerDepth, footHeight, zTouchHeight }, footAngle);
-    return {
-      id: theta.toFixed(2),
-      d: ringPathData(D, outerAspectY, false),
-      cutType: "outside",
-      cutDepthMm: round(Z),
-      toolDiaMm: bitSize,
-    };
-  });
+  const exteriorPaths: CutPath[] = exteriorThetas.map((theta) => ({
+    id: theta.toFixed(2),
+    d: ringPathData(exteriorD(theta), outerAspectY, false),
+    cutType: "outside",
+    cutDepthMm: round(exteriorZ(theta)),
+    toolDiaMm: bitSize,
+  }));
 
   const interiorThetas = stepAngles(0, 90, mmCut, interiorModel, interiorCurve).filter(
-    (t) => interiorDiameter(t, innerDiameter) >= minCuttable,
+    (t) => interiorD(t) >= minCuttable,
   );
-  const interiorPaths: CutPath[] = interiorThetas.map((theta) => {
-    const D = interiorDiameter(theta, innerDiameter);
-    const Z = interiorDepth(theta, innerDepth, outerDepth, zTouchHeight);
-    return {
-      id: theta.toFixed(2),
-      d: ringPathData(D, innerAspectY, false),
-      cutType: "inside",
-      cutDepthMm: round(Z),
-      toolDiaMm: bitSize,
-    };
-  });
+  const interiorPaths: CutPath[] = interiorThetas.map((theta) => ({
+    id: theta.toFixed(2),
+    d: ringPathData(interiorD(theta), innerAspectY, false),
+    cutType: "inside",
+    cutDepthMm: round(interiorZ(theta)),
+    toolDiaMm: bitSize,
+  }));
 
   // --- Roughing passes (vertical model: fixed 4mm Z steps) ---------------
   // Exterior roughing: pocket between the fixed stock boundary and the shrinking
@@ -236,13 +253,11 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
   const stockBoundaryD = ringPathData(boundingWidth, boundingHeight / boundingWidth, false);
 
   const exteriorRoughPaths: CutPath[] = [];
-  const zTop = exteriorDepth(90, { outerDepth, footHeight, zTouchHeight }, footAngle);
-  const zFoot = exteriorDepth(footAngle, { outerDepth, footHeight, zTouchHeight }, footAngle);
+  const zTop = exteriorZ(90);
+  const zFoot = exteriorZ(exteriorStart);
   for (let z = ceilToStep(zFoot, ROUGH_Z_STEP); z < zTop; z += ROUGH_Z_STEP) {
-    const theta = solveThetaForDepth(z, footAngle, 90, (t) =>
-      exteriorDepth(t, { outerDepth, footHeight, zTouchHeight }, footAngle),
-    );
-    const D = exteriorDiameter(theta, outerDiameter);
+    const theta = solveThetaForDepth(z, exteriorStart, 90, exteriorZ);
+    const D = exteriorD(theta);
     if (D < minCuttable) continue;
     exteriorRoughPaths.push({
       id: z.toFixed(2),
@@ -257,9 +272,11 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
   // exterior roughing file "only if there is sufficient room". Confirmed against a
   // real sample (Pear wood 5 sides): diameter = FootDiameter − (OuterDiameter −
   // InnerDiameter) [i.e. inset by the lip width on each side], depth = zFoot − 1mm.
+  // Not applicable to a custom exterior profile — there's no footDiameter to size it
+  // from, since the foot (if any) is whatever the drawn curve itself does.
   const lipWidth = (outerDiameter - innerDiameter) / 2;
   const reliefD = footDiameter - 2 * lipWidth;
-  if (footRelief && reliefD >= minCuttable) {
+  if (!customExteriorProfile && footRelief && reliefD >= minCuttable) {
     exteriorRoughPaths.push({
       id: "Relief",
       d: ringPathData(reliefD, outerAspectY, false),
@@ -272,11 +289,11 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
   // Interior roughing: simple pocket (no outer boundary needed) clearing down to
   // just short of final interior depth.
   const interiorRoughPaths: CutPath[] = [];
-  const zBottom = interiorDepth(0, innerDepth, outerDepth, zTouchHeight);
-  const zRim = interiorDepth(90, innerDepth, outerDepth, zTouchHeight);
+  const zBottom = interiorZ(0);
+  const zRim = interiorZ(90);
   for (let z = floorToStep(zBottom, ROUGH_Z_STEP); z > zRim; z -= ROUGH_Z_STEP) {
-    const theta = solveThetaForDepth(z, 0, 90, (t) => interiorDepth(t, innerDepth, outerDepth, zTouchHeight));
-    const D = interiorDiameter(theta, innerDiameter);
+    const theta = solveThetaForDepth(z, 0, 90, interiorZ);
+    const D = interiorD(theta);
     if (D < minCuttable) continue;
     interiorRoughPaths.push({
       id: z.toFixed(2),
