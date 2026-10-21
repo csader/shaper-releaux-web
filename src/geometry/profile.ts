@@ -110,18 +110,20 @@ function arcLength(curve: ProfileCurve, thetaA: number, thetaB: number, samples 
  *  - "radial": a single fixed angle increment, sized once from mmCut using the
  *    curve's speed at thetaEnd (the lip — the most forgiving point) — this is the
  *    simpler, documented "radial model" (equal-degree steps).
- *  - "circumferential": adaptively solves for Δθ so the true arc length between
- *    consecutive rings is ≈ mmCut at every step — "the standard model for all
- *    finishing cut SVGs" per the author.
- *  - "hybrid" (default): circumferential, but each step is floored at the fixed
- *    radial step size. Near θ=0 the profile is nearly flat (dZ/dθ≈0 — see
- *    interiorDepth/exteriorDepth), so for a wide, shallow shape circumferential's
- *    adaptive step can get very small there relative to the radial step, producing a
- *    dense cluster of near-identical rings for little visible benefit (the actual
- *    motivating case: a ~135mm-wide, ~13mm-deep interior pocket). Circumferential's
- *    adaptive step only ever grows as θ increases, so there's a single, well-defined
- *    crossover point past which it already exceeds the radial floor — the two models
- *    are identical beyond that point, with no threshold to tune.
+ *  - "circumferential" (default): adaptively solves for Δθ so the true arc length
+ *    between consecutive rings is ≈ mmCut at every step — "the standard model for
+ *    all finishing cut SVGs" per the author.
+ *  - "hybrid": circumferential, but each step is also grown (never shrunk) so the
+ *    ring's actual cut DEPTH changes by at least mmCut too, not just arc length.
+ *    Near θ=0 the profile is nearly flat (dZ/dθ≈0 — see interiorDepth/exteriorDepth),
+ *    so for a wide, shallow shape most of a circumferential step's arc length there
+ *    is radius, not depth, change — producing a dense cluster of rings that are each
+ *    correctly mmCut apart along the curve, but barely distinguishable in depth (the
+ *    actual motivating case: a ~135mm-wide, ~13mm-deep interior pocket). Targeting
+ *    depth directly, rather than flooring against one fixed global angle, only
+ *    coarsens exactly the region where depth genuinely isn't moving — everywhere
+ *    depth changes at a reasonable rate, hybrid stays as fine as plain
+ *    circumferential, which a single global floor couldn't do.
  */
 export function stepAngles(
   thetaStart: number,
@@ -132,10 +134,9 @@ export function stepAngles(
 ): number[] {
   if (thetaEnd <= thetaStart) return [thetaStart];
 
-  const lipSpeed = speedPerDegree(curve, thetaEnd);
-  const fixedStep = Math.max(mmCut / lipSpeed, 0.01);
-
   if (model === "radial") {
+    const lipSpeed = speedPerDegree(curve, thetaEnd);
+    const fixedStep = Math.max(mmCut / lipSpeed, 0.01);
     const thetas: number[] = [];
     let theta = thetaStart;
     while (theta < thetaEnd) {
@@ -147,7 +148,7 @@ export function stepAngles(
   }
 
   // Circumferential (and hybrid): adaptive Newton-ish search for Δθ giving
-  // arcLength ≈ mmCut; hybrid additionally floors each resulting step at fixedStep.
+  // arcLength ≈ mmCut.
   const thetas: number[] = [thetaStart];
   let theta = thetaStart;
   while (theta < thetaEnd) {
@@ -160,7 +161,35 @@ export function stepAngles(
       if (actual < 1e-9) break;
       step *= mmCut / actual;
     }
-    if (model === "hybrid") step = Math.max(step, fixedStep);
+    if (model === "hybrid") {
+      // If this step's depth change is under mmCut, grow the step (never shrink it
+      // below the circumferential value, so hybrid can't be finer than
+      // circumferential, only coarser where needed) until it isn't — via bisection,
+      // not a proportional/linear correction: near θ=0, dZ/dθ is exactly 0 (a
+      // mathematical extremum — see interiorDepth/exteriorDepth), so Z grows
+      // quadratically, not linearly, with step size there. A linear correction
+      // (`step *= mmCut / zDelta`) badly overshoots in that regime — it was observed
+      // jumping the very first step straight to thetaEnd. Bisection has no such
+      // assumption; it only relies on Z being monotonic over [theta, thetaEnd],
+      // which every profile curve already guarantees (a physically cuttable profile
+      // can't reverse direction — see customProfile.ts).
+      const candidateEnd = Math.min(theta + step, thetaEnd);
+      const zDelta = Math.abs(curve(candidateEnd).Z - curve(theta).Z);
+      if (zDelta < mmCut) {
+        let lo = step;
+        let hi = thetaEnd - theta;
+        const hiZDelta = Math.abs(curve(thetaEnd).Z - curve(theta).Z);
+        if (hiZDelta >= mmCut) {
+          for (let i = 0; i < 20; i++) {
+            const mid = (lo + hi) / 2;
+            const midZDelta = Math.abs(curve(Math.min(theta + mid, thetaEnd)).Z - curve(theta).Z);
+            if (midZDelta < mmCut) lo = mid;
+            else hi = mid;
+          }
+        }
+        step = hi; // even reaching thetaEnd without hitting mmCut just means "go there"
+      }
+    }
     theta = Math.min(theta + step, thetaEnd);
     thetas.push(theta);
   }
