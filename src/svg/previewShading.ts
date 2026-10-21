@@ -30,6 +30,14 @@ export function shadeForDepth(depth: number, minDepth: number, maxDepth: number)
   return Math.round(SHADE_SHALLOW - normalized * (SHADE_SHALLOW - SHADE_DEEP));
 }
 
+// Ring boundary outline — a distinct hue (not just another shade of grey) so it stays
+// visible against the fill regardless of how light or dark that ring's depth-based
+// shade happens to be. Width is a fraction of the bowl's own size (read from the
+// SVG's viewBox below) rather than a fixed mm value, so it reads consistently thin
+// whether the bowl is 50mm or 300mm across.
+const OUTLINE_COLOR = "#4a6cf7";
+const OUTLINE_WIDTH_FRACTION = 0.0015;
+
 export function shadePreviewSvg(svgContent: string): string {
   const doc = new DOMParser().parseFromString(svgContent, "image/svg+xml");
   const g = doc.querySelector("g");
@@ -47,16 +55,24 @@ export function shadePreviewSvg(svgContent: string): string {
   const minDepth = Math.min(...depths);
   const maxDepth = Math.max(...depths);
 
+  const viewBox = doc.documentElement.getAttribute("viewBox")?.split(/\s+/).map(Number);
+  const boundingSize = viewBox && viewBox.length === 4 ? Math.max(viewBox[2], viewBox[3]) : 100;
+  const outlineWidth = boundingSize * OUTLINE_WIDTH_FRACTION;
+
   // Original document order is smallest-ring-first (generation order). SVG paints in
   // document order, so re-append largest-first (bottom) -> smallest-last (top),
-  // otherwise the final (largest) ring would paint over every smaller one.
+  // otherwise the final (largest) ring would paint over every smaller one. Each ring
+  // is a full filled shape at its own diameter (not an annulus), so painting them in
+  // this order and keeping each one's own outline means that outline only ever shows
+  // where a smaller ring hasn't painted over it — exactly at that ring's boundary.
   for (let i = n - 1; i >= 0; i--) g.appendChild(paths[i]);
 
   paths.forEach((p, i) => {
     const shade = shadeForDepth(depths[i], minDepth, maxDepth);
     p.setAttribute(
       "style",
-      `fill:rgb(${shade},${shade},${shade}) !important;stroke:none !important;opacity:1 !important`,
+      `fill:rgb(${shade},${shade},${shade}) !important;stroke:${OUTLINE_COLOR} !important;` +
+        `stroke-width:${outlineWidth} !important;stroke-opacity:0.6 !important;opacity:1 !important`,
     );
   });
 
