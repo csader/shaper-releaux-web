@@ -76,7 +76,8 @@ export function generateChord(params: ChordParams): GeneratedFile[] {
     "Flute Count": params.fluteCount,
     "Flute Pitch": params.flutePitchMm,
     "Bit Size": params.bitSize,
-    "Computed Radius": round(chordRadius(halfWidth, params.grooveDepthMm)),
+    // Ogee isn't a circular arc — chordRadius's circle-fit reading doesn't apply.
+    "Computed Radius": params.profile === "ogee" ? "N/A (ogee)" : round(chordRadius(halfWidth, params.grooveDepthMm)),
   };
 
   const chunks = splitIntoChunks(paths);

@@ -309,7 +309,7 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
   // enabled) lands at the identical physical spot in each — the same registration
   // mark works across all four passes without re-measuring.
   const anchorPoint = anchor ? resolveAnchorPoint(anchor, box, { x: cx, y: cy }) : null;
-  const anchorPathData = anchorPoint ? anchorTrianglePathData(anchorPoint.x, anchorPoint.y, anchor!.position) : undefined;
+  const anchorPathData = anchorPoint ? anchorTrianglePathData(anchorPoint.x, anchorPoint.y) : undefined;
 
   const shapeName = sanitizeForFilename(shapeNameFor(params));
 

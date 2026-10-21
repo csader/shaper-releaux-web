@@ -11,6 +11,9 @@ import { NumberField } from "../../components/NumberField";
 import { ProfileCurveEditor } from "../../components/ProfileCurveEditor";
 import type { CustomProfile } from "../../geometry/customProfile";
 import { scallopHeight } from "../../geometry/scallop";
+import { bowlParamsToFields, parseBowlParams } from "./paramsFile";
+import { UploadIcon } from "../../icons/UploadIcon";
+import { serializeParamsFile } from "../../params/paramsFile";
 
 const SIDE_LABELS: Record<Sides, string> = {
   1: "1 — Circle / Ellipse",
@@ -212,9 +215,31 @@ export function BowlTool({ unit }: { unit: Unit }) {
   const [exteriorProfileMode, setExteriorProfileMode] = useState<"parametric" | "custom">("parametric");
   const [interiorProfile, setInteriorProfile] = useState<CustomProfile>(DEFAULT_INTERIOR_PROFILE);
   const [exteriorProfile, setExteriorProfile] = useState<CustomProfile>(DEFAULT_EXTERIOR_PROFILE);
+  const [importWarnings, setImportWarnings] = useState<string[]>([]);
+  const paramsFileInputRef = useRef<HTMLInputElement>(null);
   const isExteriorCustomProfile = exteriorProfileMode === "custom";
   const set = <K extends keyof BowlParams>(key: K, value: BowlParams[K]) =>
     setParams((p) => ({ ...p, [key]: value }));
+
+  function handleImportParams(file: File) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const { params: restored, warnings } = parseBowlParams(String(reader.result ?? ""), DEFAULTS);
+      setImportWarnings(warnings);
+      setParams(restored);
+      setShapeSource(restored.sides === "custom" ? "upload" : "builtin");
+      // Neither a custom shape outline nor a custom profile curve is restorable from
+      // this file (see paramsFile.ts) — parseBowlParams already strips them from
+      // `restored`, so these modes/toggles are reset to match rather than left
+      // pointing at now-stale local editor state.
+      setInteriorProfileMode("parametric");
+      setExteriorProfileMode("parametric");
+      setUseZTouchBlock(restored.zTouchHeight !== restored.outerDepth);
+      setIndependentFinishingModel(restored.interiorModel !== restored.exteriorModel);
+      setIndependentAxes(restored.outerDiameterY !== undefined || restored.innerDiameterY !== undefined);
+    };
+    reader.readAsText(file);
+  }
   const setBothModels = (v: BowlParams["interiorModel"]) =>
     setParams((p) => ({ ...p, interiorModel: v, exteriorModel: v }));
   const effectiveZTouchHeight = useZTouchBlock ? params.zTouchHeight : params.outerDepth;
@@ -252,20 +277,29 @@ export function BowlTool({ unit }: { unit: Unit }) {
     ? resolveAnchorPoint(params.anchor, boundingBox, { x: shapeCenter.cx, y: shapeCenter.cy })
     : null;
 
+  const effectiveParams: BowlParams = {
+    ...params,
+    zTouchHeight: effectiveZTouchHeight,
+    customInteriorProfile: interiorProfileMode === "custom" ? interiorProfile : undefined,
+    customExteriorProfile: exteriorProfileMode === "custom" ? exteriorProfile : undefined,
+  };
+
   const files = useMemo(() => {
     if (isCustom && !params.customShape) return [];
     try {
-      return generateBowl({
-        ...params,
-        zTouchHeight: effectiveZTouchHeight,
-        customInteriorProfile: interiorProfileMode === "custom" ? interiorProfile : undefined,
-        customExteriorProfile: exteriorProfileMode === "custom" ? exteriorProfile : undefined,
-      });
+      return generateBowl(effectiveParams);
     } catch (e) {
       console.error(e);
       return [];
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params, isCustom, effectiveZTouchHeight, interiorProfileMode, exteriorProfileMode, interiorProfile, exteriorProfile]);
+
+  const downloadFiles = useMemo(
+    () => [...files, { name: "Parameters.txt", content: serializeParamsFile("Bowl", bowlParamsToFields(effectiveParams)) }],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [files, params, effectiveZTouchHeight, interiorProfileMode, exteriorProfileMode, interiorProfile, exteriorProfile],
+  );
 
   const exteriorPreview = files.find((f) => f.kind === "exterior");
   const interiorPreview = files.find((f) => f.kind === "interior");
@@ -344,6 +378,37 @@ export function BowlTool({ unit }: { unit: Unit }) {
           </label>
         )}
 
+        <hr className="section-separator" />
+
+        <div className="params-header">
+          <button
+            type="button"
+            className="upload-icon-button"
+            title="Upload Parameters File"
+            aria-label="Upload Parameters File"
+            onClick={() => paramsFileInputRef.current?.click()}
+          >
+            <UploadIcon />
+          </button>
+          <h3>Parameters</h3>
+          <input
+            ref={paramsFileInputRef}
+            type="file"
+            accept=".txt,text/plain"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleImportParams(file);
+              e.target.value = "";
+            }}
+          />
+        </div>
+        {importWarnings.map((w, i) => (
+          <p key={i} className="warning-note">
+            {w}
+          </p>
+        ))}
+
         <div className="profile-mode-section">
           {!isExteriorOnly && (
             <>
@@ -397,6 +462,8 @@ export function BowlTool({ unit }: { unit: Unit }) {
           )}
         </div>
 
+        <div className="param-group">
+        <h4>Machining &amp; Finishing Model</h4>
         <label className="field">
           <span>Machining</span>
           <select
@@ -455,6 +522,10 @@ export function BowlTool({ unit }: { unit: Unit }) {
             </label>
           </>
         )}
+        </div>
+
+        <div className="param-group">
+        <h4>Dimensions</h4>
         <NumberField
           label={isInteriorOnly ? "Stock thickness" : "Outer depth"}
           valueMm={params.outerDepth}
@@ -541,6 +612,10 @@ export function BowlTool({ unit }: { unit: Unit }) {
             )}
           </>
         )}
+        </div>
+
+        <div className="param-group">
+        <h4>Cutting Settings</h4>
         <label className="field checkbox-field">
           <input
             type="checkbox"
@@ -594,6 +669,7 @@ export function BowlTool({ unit }: { unit: Unit }) {
           />
           <span>Include bounding-box guide rectangle</span>
         </label>
+        </div>
 
         <label className="field checkbox-field">
           <input
@@ -685,11 +761,11 @@ export function BowlTool({ unit }: { unit: Unit }) {
 
         <div className="downloads">
           <p>
-            {files.length} {files.length === 1 ? "file" : "files"} generated.
+            {downloadFiles.length} {downloadFiles.length === 1 ? "file" : "files"} generated.
           </p>
-          <button onClick={() => downloadAllAsZip(files, "reuleaux-bowl.zip")}>Download all (.zip)</button>
+          <button onClick={() => downloadAllAsZip(downloadFiles, "reuleaux-bowl.zip")}>Download all (.zip)</button>
           <ul>
-            {files.map((f) => (
+            {downloadFiles.map((f) => (
               <li key={f.name}>
                 {f.name} <button onClick={() => downloadFile(f)}>download</button>
               </li>

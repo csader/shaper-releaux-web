@@ -36,22 +36,6 @@ export interface BoundingBox {
 export const ANCHOR_LEG_X_MM = 5;
 export const ANCHOR_LEG_Y_MM = 10;
 
-// Which way each leg points, so the marker sits inside the design's bounding box
-// rather than off the edge (purely cosmetic for the preview — Origin only cares
-// about the right-angle vertex and relative leg lengths).
-export const ANCHOR_DIRECTION: Record<AnchorPosition, { sx: 1 | -1; sy: 1 | -1 }> = {
-  "top-left": { sx: 1, sy: 1 },
-  "top-center": { sx: 1, sy: 1 },
-  "top-right": { sx: -1, sy: 1 },
-  "middle-left": { sx: 1, sy: 1 },
-  center: { sx: 1, sy: 1 },
-  "middle-right": { sx: -1, sy: 1 },
-  "bottom-left": { sx: 1, sy: -1 },
-  "bottom-center": { sx: 1, sy: -1 },
-  "bottom-right": { sx: -1, sy: -1 },
-  custom: { sx: 1, sy: 1 },
-};
-
 /**
  * `trueCenter`, if given, is used for position="center" instead of the bounding
  * box's own midpoint — they can differ (e.g. odd-n Reuleaux shapes aren't centered
@@ -95,10 +79,19 @@ export function resolveAnchorPoint(
   }
 }
 
-export function anchorTrianglePathData(x: number, y: number, position: AnchorPosition): string {
-  const { sx, sy } = ANCHOR_DIRECTION[position];
-  const x2 = x + sx * ANCHOR_LEG_X_MM;
-  const y2 = y + sy * ANCHOR_LEG_Y_MM;
+/** Direction is fixed, not position-dependent: short (X) leg to the right, long (Y)
+ * leg upward (negative in SVG's own y-down coordinate space) — confirmed against
+ * Shaper Studio's own rendering, which always places the right-angle vertex at what
+ * reads visually as the marker's bottom-left corner. An earlier version of this
+ * function pointed each leg "inward" toward the bounding box depending on which grid
+ * cell was picked (purely cosmetic, since per Shaper's own custom-anchor spec, Origin
+ * only reads the right-angle vertex and relative leg lengths — it realigns axes to
+ * its own grid/screen regardless of which way the legs point in the file) — that
+ * made most positions render upside-down relative to Studio's own convention, which
+ * is what this fixed direction fixes. */
+export function anchorTrianglePathData(x: number, y: number): string {
+  const x2 = x + ANCHOR_LEG_X_MM;
+  const y2 = y - ANCHOR_LEG_Y_MM;
   return `M ${round(x)} ${round(y)} L ${round(x2)} ${round(y)} L ${round(x)} ${round(y2)} Z`;
 }
 

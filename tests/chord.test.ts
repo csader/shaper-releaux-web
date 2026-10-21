@@ -62,3 +62,29 @@ describe("chordDepthAt (convex profile — reeding, the complement of concave fl
     }
   });
 });
+
+describe("chordDepthAt (ogee profile — a cyma S-curve, not a circular arc)", () => {
+  it("is zero at the low edge (X = -halfWidth)", () => {
+    expect(chordDepthAt(-29, 29, 9.5, "ogee")).toBeCloseTo(0, 6);
+  });
+
+  it("equals the full depth at the high edge (X = +halfWidth)", () => {
+    expect(chordDepthAt(29, 29, 9.5, "ogee")).toBeCloseTo(9.5, 6);
+  });
+
+  it("is exactly half depth at the centerline (the inflection point)", () => {
+    expect(chordDepthAt(0, 29, 9.5, "ogee")).toBeCloseTo(4.75, 6);
+  });
+
+  it("is strictly increasing from low edge to high edge (monotonic ramp, unlike concave/convex)", () => {
+    const samples = [-29, -20, -10, 0, 10, 20, 29].map((x) => chordDepthAt(x, 29, 9.5, "ogee"));
+    for (let i = 1; i < samples.length; i++) {
+      expect(samples[i]).toBeGreaterThan(samples[i - 1]);
+    }
+  });
+
+  it("clamps to 0/full depth rather than extrapolating past either edge", () => {
+    expect(chordDepthAt(-40, 29, 9.5, "ogee")).toBe(0);
+    expect(chordDepthAt(40, 29, 9.5, "ogee")).toBeCloseTo(9.5, 6);
+  });
+});

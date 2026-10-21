@@ -9,6 +9,7 @@
 // geometry: centroid, containment, scaling) into customShape.ts.
 
 import type { Loop } from "../geometry/customShape";
+import { matrixPoint, sampleGeometryElement } from "./sampleGeometry";
 
 export interface Candidate {
   id: string;
@@ -60,7 +61,6 @@ export function extractDeclaredSizeMm(svgText: string): DeclaredSize | null {
 
 const SHAPE_SELECTOR = "path, polygon, polyline, rect, circle, ellipse";
 const MAX_POINTS_PER_LOOP = 200;
-const MIN_ARC_LENGTH_STEP = 0.5; // in the element's own user units
 // A real decorative outline is a handful of shapes at most. A Shaper toolpath file
 // (like the ones this app itself exports) can have hundreds of concentric rings —
 // treating each as a hole candidate blows up the pairwise overlap/containment checks
@@ -69,25 +69,6 @@ const MIN_ARC_LENGTH_STEP = 0.5; // in the element's own user units
 // rest and freezing the tab; the caller surfaces this as a clear rejection, not silent
 // truncation.
 export const MAX_CANDIDATES = 40;
-
-function matrixPoint(m: DOMMatrix, x: number, y: number): { x: number; y: number } {
-  const p = new DOMPoint(x, y).matrixTransform(m);
-  return { x: p.x, y: p.y };
-}
-
-function sampleGeometry(el: SVGGeometryElement): { x: number; y: number }[] {
-  const total = el.getTotalLength();
-  if (!Number.isFinite(total) || total < 1e-6) return [];
-  const step = Math.max(MIN_ARC_LENGTH_STEP, total / MAX_POINTS_PER_LOOP);
-  const count = Math.min(MAX_POINTS_PER_LOOP, Math.max(8, Math.ceil(total / step)));
-  const points: { x: number; y: number }[] = [];
-  for (let i = 0; i < count; i++) {
-    const len = (total * i) / count;
-    const p = el.getPointAtLength(len);
-    points.push({ x: p.x, y: p.y });
-  }
-  return points;
-}
 
 function splitPathSubpaths(d: string): string[] {
   const trimmed = d.trim();
@@ -164,14 +145,14 @@ export function parseCandidateLoops(svgText: string): Candidate[] {
           if (!isClosedSubpath(sub)) continue;
           const temp = document.createElementNS("http://www.w3.org/2000/svg", "path");
           temp.setAttribute("d", sub);
-          const localPoints = sampleGeometry(temp);
+          const localPoints = sampleGeometryElement(temp, MAX_POINTS_PER_LOOP);
           if (localPoints.length < 3) continue;
           const loop = dedupeClose(localPoints.map((p) => matrixPoint(ctm, p.x, p.y)));
           if (loop.length < 3) continue;
           candidates.push({ id: `candidate-${counter++}`, loop, area: loopArea(loop) });
         }
       } else if (tag === "polyline") {
-        const localPoints = sampleGeometry(el);
+        const localPoints = sampleGeometryElement(el, MAX_POINTS_PER_LOOP);
         const loop = dedupeClose(localPoints.map((p) => matrixPoint(ctm, p.x, p.y)));
         // polyline is open by SVG definition — only treat as a candidate if its
         // endpoints are (near) coincident, i.e. the author effectively closed it.
@@ -182,7 +163,7 @@ export function parseCandidateLoops(svgText: string): Candidate[] {
         candidates.push({ id: `candidate-${counter++}`, loop, area: loopArea(loop) });
       } else {
         // polygon, rect, circle, ellipse are always closed.
-        const localPoints = sampleGeometry(el);
+        const localPoints = sampleGeometryElement(el, MAX_POINTS_PER_LOOP);
         const loop = dedupeClose(localPoints.map((p) => matrixPoint(ctm, p.x, p.y)));
         if (loop.length < 3) continue;
         candidates.push({ id: `candidate-${counter++}`, loop, area: loopArea(loop) });

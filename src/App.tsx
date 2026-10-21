@@ -68,13 +68,9 @@ export default function App() {
           )}
         </header>
         <main>
-          {tab === "bowl" ? (
-            <BowlTool unit={unit} />
-          ) : tab === "ripple" ? (
-            <RippleTool unit={unit} />
-          ) : (
-            <ChordTool unit={unit} />
-          )}
+          {tab === "bowl" && <BowlTool unit={unit} />}
+          {tab === "ripple" && <RippleTool unit={unit} />}
+          {tab === "chord" && <ChordTool unit={unit} />}
         </main>
       </div>
     </div>

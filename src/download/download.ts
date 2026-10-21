@@ -10,8 +10,12 @@ function triggerDownload(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+function mimeTypeFor(filename: string): string {
+  return filename.endsWith(".txt") ? "text/plain" : "image/svg+xml";
+}
+
 export function downloadFile(file: GeneratedFile) {
-  triggerDownload(new Blob([file.content], { type: "image/svg+xml" }), file.name);
+  triggerDownload(new Blob([file.content], { type: mimeTypeFor(file.name) }), file.name);
 }
 
 export function downloadAllAsZip(files: GeneratedFile[], zipName: string) {

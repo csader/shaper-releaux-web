@@ -328,7 +328,8 @@ header h1 {
 }
 
 .anchor-picker,
-.profile-mode-section {
+.profile-mode-section,
+.param-group {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -336,6 +337,45 @@ header h1 {
   background: #222228;
   border: 1px solid #3c3c44;
   border-radius: 6px;
+}
+
+.param-group h4 {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #c8c8ce;
+}
+
+.section-separator {
+  border: none;
+  border-top: 1px solid #3c3c44;
+  margin: 0.75rem 0;
+}
+
+.params-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.params-header h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.upload-icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #2a2a30;
+  color: #e8e8ea;
+  border: 1px solid #3c3c44;
+  border-radius: 6px;
+  padding: 0.3rem;
+  cursor: pointer;
+}
+
+.upload-icon-button:hover {
+  border-color: #4a6cf7;
 }
 
 .anchor-grid {

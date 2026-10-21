@@ -52,13 +52,12 @@ describe("resolveAnchorPoint", () => {
 
 describe("anchorTrianglePathData", () => {
   it("places the right angle at the given point, with a shorter X leg and longer Y leg", () => {
-    const d = anchorTrianglePathData(5, 5, "top-left");
-    // top-left direction is (+1, +1): legs extend toward +x and +y.
-    expect(d).toBe("M 5 5 L 10 5 L 5 15 Z");
+    const d = anchorTrianglePathData(5, 5);
+    expect(d).toBe("M 5 5 L 10 5 L 5 -5 Z");
   });
 
-  it("flips leg direction per position so the marker points into the bounding box", () => {
-    expect(anchorTrianglePathData(0, 0, "bottom-right")).toBe("M 0 0 L -5 0 L 0 -10 Z");
-    expect(anchorTrianglePathData(0, 0, "top-right")).toBe("M 0 0 L -5 0 L 0 10 Z");
+  it("direction is fixed regardless of where the point is: X leg right, Y leg up — matching Shaper Studio's own convention (right angle at the marker's visual bottom-left)", () => {
+    expect(anchorTrianglePathData(0, 0)).toBe("M 0 0 L 5 0 L 0 -10 Z");
+    expect(anchorTrianglePathData(100, 50)).toBe("M 100 50 L 105 50 L 100 40 Z");
   });
 });
