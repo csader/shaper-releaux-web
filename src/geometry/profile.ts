@@ -3,6 +3,8 @@
 // the cut depth Z(θ) relative to the Z-touch reference. Formulas confirmed exactly
 // (to 5 decimal places) against both the author's spreadsheet and a real bowl's SVG.
 
+import { solveThetaForDepth } from "./invert";
+
 const toRad = (deg: number) => (deg * Math.PI) / 180;
 
 export interface BowlParams {
@@ -79,7 +81,7 @@ export function exteriorProfile(
   });
 }
 
-export type SteppingModel = "radial" | "circumferential" | "hybrid";
+export type SteppingModel = "radial" | "circumferential" | "hybrid" | "horizontal";
 
 /** Numerical derivative of a profile curve at θ, in units per degree. */
 function speedPerDegree(curve: ProfileCurve, theta: number): number {
@@ -124,6 +126,15 @@ function arcLength(curve: ProfileCurve, thetaA: number, thetaB: number, samples 
  *    coarsens exactly the region where depth genuinely isn't moving — everywhere
  *    depth changes at a reasonable rate, hybrid stays as fine as plain
  *    circumferential, which a single global floor couldn't do.
+ *  - "horizontal": steps so the in-plane RADIUS increases by a constant mmCut each
+ *    time, rather than arc length (circumferential) or angle (radial). This is the
+ *    author's own fourth model — constant-radius rings — which he recommends for
+ *    wide, shallow shapes (e.g. a stool top): on a steep wall near the lip,
+ *    constant-radius steps naturally widen in angle as the wall steepens, opposite of
+ *    circumferential's constant arc length, which narrows the angle step there
+ *    instead. R(θ) is monotonic over any physically cuttable profile (same guarantee
+ *    hybrid's bisection above relies on), so this reuses the same generic bisection
+ *    solver as depth inversion elsewhere, just inverting R instead of Z.
  */
 export function stepAngles(
   thetaStart: number,
@@ -144,6 +155,18 @@ export function stepAngles(
       theta = Math.min(theta + fixedStep, thetaEnd);
     }
     thetas.push(thetaEnd);
+    return thetas;
+  }
+
+  if (model === "horizontal") {
+    const thetas: number[] = [thetaStart];
+    let theta = thetaStart;
+    const rEnd = curve(thetaEnd).R;
+    while (theta < thetaEnd) {
+      const rTarget = curve(theta).R + mmCut;
+      theta = rTarget >= rEnd ? thetaEnd : solveThetaForDepth(rTarget, theta, thetaEnd, (t) => curve(t).R);
+      thetas.push(theta);
+    }
     return thetas;
   }
 

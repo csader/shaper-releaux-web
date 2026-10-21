@@ -10,6 +10,7 @@ import { resolveAnchorPoint, type AnchorConfig, type AnchorPosition, type Boundi
 import { NumberField } from "../../components/NumberField";
 import { ProfileCurveEditor } from "../../components/ProfileCurveEditor";
 import type { CustomProfile } from "../../geometry/customProfile";
+import { scallopHeight } from "../../geometry/scallop";
 
 const SIDE_LABELS: Record<Sides, string> = {
   1: "1 — Circle / Ellipse",
@@ -114,15 +115,19 @@ function Readout({
   valueMm,
   unit,
   warnIfBelowMm,
+  warnIfAboveMm,
   warningText,
 }: {
   label: string;
   valueMm: number;
   unit: Unit;
   warnIfBelowMm?: number;
+  warnIfAboveMm?: number;
   warningText?: string;
 }) {
-  const isWarning = warnIfBelowMm !== undefined && valueMm < warnIfBelowMm;
+  const isWarning =
+    (warnIfBelowMm !== undefined && valueMm < warnIfBelowMm) ||
+    (warnIfAboveMm !== undefined && valueMm > warnIfAboveMm);
   return (
     <div className={`field readout ${isWarning ? "readout-warning" : ""}`}>
       <span>{label}</span>
@@ -150,6 +155,7 @@ function ModelToggle({
         <option value="circumferential">Circumferential (default, matches the original app, most consistent furrow width)</option>
         <option value="hybrid">Hybrid (avoids dense clustering on wide/shallow shapes)</option>
         <option value="radial">Radial (simpler math, more variable width)</option>
+        <option value="horizontal">Horizontal (constant radius steps — best for wide/shallow shapes, e.g. stool tops)</option>
       </select>
     </label>
   );
@@ -235,6 +241,10 @@ export function BowlTool({ unit }: { unit: Unit }) {
   // for a standalone pocket/tray there's no foot being carved out from below.
   const floorThickness =
     params.outerDepth - params.innerDepth - (isInteriorOnly || isExteriorCustomProfile ? 0 : params.footHeight);
+  // The ridge left between two adjacent ball-nose finishing passes — depends on bit
+  // radius, not just MM cut, so the same MM cut leaves a rougher finish on a smaller
+  // bit. null means MM cut meets/exceeds the bit diameter: not just rough, gaps.
+  const scallop = scallopHeight(params.bitSize, params.mmCut);
 
   const boundingBox = boundingBoxFor(params);
   const shapeCenter = shapeCenterFor(params);
@@ -552,6 +562,20 @@ export function BowlTool({ unit }: { unit: Unit }) {
           </p>
         )}
         <NumberField label="MM cut (width of cut paths)" valueMm={params.mmCut} onChangeMm={(v) => set("mmCut", v)} unit={unit} />
+        {scallop !== null ? (
+          <Readout
+            label="Scallop height (ball-nose finish)"
+            valueMm={scallop}
+            unit={unit}
+            warnIfAboveMm={0.1}
+            warningText="Noticeable ridges between passes — reduce MM cut, or use a larger-diameter bit, for a smoother finish."
+          />
+        ) : (
+          <p className="warning-note">
+            MM cut is at or above the bit diameter — that leaves uncut gaps between passes, not just a rough
+            finish. Reduce MM cut below the bit size.
+          </p>
+        )}
         <IntegerField
           label="Max paths per file"
           value={params.maxPathsPerFile ?? 250}

@@ -17,6 +17,8 @@ Capabilities that don't exist in the original Windows app:
 - **Custom SVG import**: upload your own closed outline — including shapes with holes (e.g. a ring, a letterform) — and it drives the same profile math, roughing, and relief-pocket pipeline as the built-in shapes. Includes a candidate picker, validation (self-intersection, hole containment), and a multi-scale preview so problems are visible before generating
 - **Radial stepping as a selectable alternative** to circumferential, per surface (the original app only ever produces circumferential output)
 - **Hybrid stepping model** — circumferential, floored at the fixed radial step size. On a wide, shallow profile, circumferential alone can pack a dense cluster of near-identical rings near the center (the profile is nearly flat there — see the comment on `stepAngles` in `src/geometry/profile.ts`); hybrid avoids that with no added parameters, converging to pure circumferential once its own adaptive step naturally grows past the radial floor. Circumferential (the original app's only model) is still the default; switch to Hybrid for a wide/shallow shape prone to that clustering
+- **Horizontal stepping model** — the original app's own fourth, undocumented-in-code model: constant-radius steps rather than constant arc length (circumferential) or constant angle (radial). The author recommends it specifically for wide, shallow shapes like stool tops
+- **Scallop (cusp) height readout** — the ridge left between adjacent ball-nose finishing passes depends on the bit's radius, not just MM cut, so the same MM cut leaves a visibly rougher finish on a smaller-diameter bit. Shown live next to the MM cut field, with a warning when it's large enough to be visible, and a distinct error when MM cut meets or exceeds the bit diameter (that leaves gaps, not just roughness)
 - **Foot relief pocket on/off toggle** (the original always includes it when there's room)
 - **mm/in input toggle** (exported files are still always mm, matching the original's metric-only convention — not a Shaper Origin limitation, its cutDepth encoding supports both units)
 - **Dimension fields accept expressions**, not just plain numbers — explicit unit suffixes (`mm`, `cm`, `m`, `in`, `ft`) override the field's current mm/in toggle, and `+ - * /` with parentheses are supported, e.g. `15mm + (3/4*4)in`
@@ -32,6 +34,10 @@ Capabilities that don't exist in the original Windows app:
 ### Wave / Ripple Generator — new in this version
 
 Not part of Reuleaux.exe at all. The original author documented a related but separate technique, [Wave Effect Surface Treatment](https://hub.shapertools.com/) (CC BY-NC-SA 4.0 — noncommercial, attribution, share-alike) — a manual Inkscape + spreadsheet workflow, not a tool. This turns that technique into a generator for parallel furrows, a tileable sine contour, or concentric diminishing rings.
+
+### Chord / Flute Groove Generator — new in this version
+
+Not part of Reuleaux.exe at all. The original author's documentation also includes "Chord calculations" for straight decorative grooves/flutes (e.g. fluted door staves) — a Pythagorean formula for the groove's depth profile, separate from both the bowl's elliptical cross-section and the wave technique's sine-based math. This turns that formula into a generator: a groove is modeled as a circular arc in cross-section (the radius is computed from the groove's width and center depth) and cut as a stack of parallel full-length passes stepped across the groove's width, each at the depth the arc calls for at that offset. Supports a single groove or multiple evenly-spaced parallel flutes, and shows the groove's computed radius of curvature as a readout (a round-nose/core-box bit of that radius would cut the same groove in one pass instead of many stepped ones).
 
 ## Getting started
 
@@ -65,7 +71,7 @@ The geometry is unit-tested against real ground-truth data where it exists: a kn
 src/
   geometry/     pure math: profile curves, per-shape outline construction, custom-shape handling
   svg/          SVG document assembly (Shaper namespace, path building, file splitting)
-  tools/        bowl/ and ripple/ — orchestration + UI for each tool
+  tools/        bowl/, ripple/, and chord/ — orchestration + UI for each tool
   import/       browser-native SVG parsing for custom shape upload
 tests/          geometry correctness, much of it validated against real sample output
 ```

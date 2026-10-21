@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { BowlTool } from "./tools/bowl/BowlTool";
 import { RippleTool } from "./tools/ripple/RippleTool";
+import { ChordTool } from "./tools/chord/ChordTool";
 import { BowlIcon } from "./icons/BowlIcon";
 import { WaveIcon } from "./icons/WaveIcon";
+import { ChordIcon } from "./icons/ChordIcon";
 import type { Unit } from "./units";
 import logo from "./assets/logo.svg";
 import "./App.css";
 
-type Tab = "bowl" | "ripple";
+type Tab = "bowl" | "ripple" | "chord";
 
 export default function App() {
   const [tab, setTab] = useState<Tab>("bowl");
@@ -33,6 +35,14 @@ export default function App() {
           >
             <WaveIcon />
           </button>
+          <button
+            className={`icon-nav-button ${tab === "chord" ? "active" : ""}`}
+            title="Chord / Flute Groove Generator"
+            aria-label="Chord / Flute Groove Generator"
+            onClick={() => setTab("chord")}
+          >
+            <ChordIcon />
+          </button>
         </div>
         <div className="icon-nav-unit-toggle" role="group" aria-label="Units">
           <button className={unit === "mm" ? "active" : ""} title="Millimeters" onClick={() => setUnit("mm")}>
@@ -57,7 +67,15 @@ export default function App() {
             </p>
           )}
         </header>
-        <main>{tab === "bowl" ? <BowlTool unit={unit} /> : <RippleTool unit={unit} />}</main>
+        <main>
+          {tab === "bowl" ? (
+            <BowlTool unit={unit} />
+          ) : tab === "ripple" ? (
+            <RippleTool unit={unit} />
+          ) : (
+            <ChordTool unit={unit} />
+          )}
+        </main>
       </div>
     </div>
   );
