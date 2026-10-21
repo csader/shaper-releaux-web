@@ -74,8 +74,8 @@ const DEFAULTS: BowlParams = {
   zTouchHeight: 60,
   bitSize: 8,
   mmCut: 0.5,
-  interiorModel: "hybrid",
-  exteriorModel: "hybrid",
+  interiorModel: "circumferential",
+  exteriorModel: "circumferential",
   footRelief: true,
   maxPathsPerFile: 250,
   anchor: DEFAULT_ANCHOR,
@@ -147,8 +147,8 @@ function ModelToggle({
     <label className="field">
       <span>{label}</span>
       <select value={value} onChange={(e) => onChange(e.target.value as SteppingModel)}>
-        <option value="hybrid">Hybrid (default, avoids dense clustering on wide/shallow shapes)</option>
-        <option value="circumferential">Circumferential (most consistent furrow width, can cluster densely)</option>
+        <option value="circumferential">Circumferential (default, matches the original app, most consistent furrow width)</option>
+        <option value="hybrid">Hybrid (avoids dense clustering on wide/shallow shapes)</option>
         <option value="radial">Radial (simpler math, more variable width)</option>
       </select>
     </label>
@@ -304,8 +304,8 @@ export function BowlTool({ unit }: { unit: Unit }) {
               onFileName={(name) => set("customShapeName", name)}
             />
             <p className="hint-note">
-              Custom shapes can still produce large files with the Circumferential finishing model on a wide,
-              shallow shape — Hybrid (the default) or Radial produce fewer, larger-stepped rings.
+              Custom shapes can still produce large files with the default Circumferential finishing model on a
+              wide, shallow shape — Hybrid or Radial produce fewer, larger-stepped rings.
             </p>
             <p className="hint-note">
               The uploaded outline only sets proportions — Outer/Inner width below still set the real-world size,
