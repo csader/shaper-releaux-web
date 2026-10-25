@@ -4,23 +4,44 @@ import { evaluateCustomProfile, type CustomProfile, type ProfilePoint } from "..
 const WIDTH = 240;
 const HEIGHT = 150;
 const PAD = 20;
-const MIN_GAP = 0.03; // minimum normalized r separation enforced between neighboring points
+// Minimum normalized r separation enforced between neighboring points — just enough
+// to keep monotoneCubicAt's secant-slope division (values[i+1]-values[i]) /
+// (xs[i+1]-xs[i]) away from a literal divide-by-zero, not a usability-motivated
+// spacing. Used to be 0.03 (3% of the full width), which hard-capped any point at
+// r=0.97 next to the fixed r=1 rim endpoint — too wide a margin to draw a sharp,
+// near-vertical wall right at the rim (or the center), which is a real, physically
+// cuttable profile (a steep wall, not a literal infinite-slope one).
+const MIN_GAP = 0.004;
 
-function toScreen(p: ProfilePoint): { x: number; y: number } {
-  return { x: PAD + p.r * (WIDTH - 2 * PAD), y: PAD + p.z * (HEIGHT - 2 * PAD) };
+// `z` is always stored/consumed as 0=shallow/1=deep CUT DEPTH (what toProfileCurve
+// needs — see customProfile.ts). For interior that already reads as "physically
+// low/high" too (shallow near the rim, deep at the pocket's bottom), so no flip is
+// needed there. For exterior it's the opposite: the exterior operation's own Z=0
+// reference is the foot (the part that ends up physically LOW once the piece is
+// flipped back to a normal, rim-up orientation), and Z=max is the rim (physically
+// HIGH in that same normal orientation) — the exact inverse of "shallow cut = high
+// up." Drawing it literally (shallow→top of screen) made the editor's curve look
+// upside-down compared to the actual physical shape (confirmed against the
+// cross-section preview, which IS in that normal rim-up orientation). `flipZ` only
+// changes the SCREEN mapping, not the stored data — the values handed to onChange
+// are still plain 0=shallow/1=deep cutDepth either way.
+function toScreen(p: ProfilePoint, flipZ: boolean): { x: number; y: number } {
+  const zFrac = flipZ ? 1 - p.z : p.z;
+  return { x: PAD + p.r * (WIDTH - 2 * PAD), y: PAD + zFrac * (HEIGHT - 2 * PAD) };
 }
 
-function fromScreen(x: number, y: number): ProfilePoint {
+function fromScreen(x: number, y: number, flipZ: boolean): ProfilePoint {
   const r = (x - PAD) / (WIDTH - 2 * PAD);
-  const z = (y - PAD) / (HEIGHT - 2 * PAD);
-  return { r: Math.min(1, Math.max(0, r)), z: Math.min(1, Math.max(0, z)) };
+  let zFrac = (y - PAD) / (HEIGHT - 2 * PAD);
+  if (flipZ) zFrac = 1 - zFrac;
+  return { r: Math.min(1, Math.max(0, r)), z: Math.min(1, Math.max(0, zFrac)) };
 }
 
-function curvePathData(profile: CustomProfile, samples = 60): string {
+function curvePathData(profile: CustomProfile, flipZ: boolean, samples = 60): string {
   const parts: string[] = [];
   for (let i = 0; i <= samples; i++) {
     const { r, z } = evaluateCustomProfile(profile, i / samples);
-    const { x, y } = toScreen({ r, z });
+    const { x, y } = toScreen({ r, z }, flipZ);
     parts.push(`${i === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`);
   }
   return parts.join(" ");
@@ -33,6 +54,10 @@ interface ProfileCurveEditorProps {
   startLabel: string;
   /** Label for the r=1 end — always "Rim". */
   endLabel: string;
+  /** See the comment above toScreen — set for the exterior curve, so what you draw
+   * visually matches the bowl's normal rim-up orientation (and the cross-section
+   * preview), instead of the exterior operation's own (rim-down) cutDepth frame. */
+  flipZ?: boolean;
 }
 
 /**
@@ -43,7 +68,7 @@ interface ProfileCurveEditorProps {
  * during drag/insert to stay monotonic in both r and z — a physical requirement, not
  * just tidiness: a bit cutting from directly above can't undercut.
  */
-export function ProfileCurveEditor({ profile, onChange, startLabel, endLabel }: ProfileCurveEditorProps) {
+export function ProfileCurveEditor({ profile, onChange, startLabel, endLabel, flipZ = false }: ProfileCurveEditorProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
 
@@ -95,7 +120,7 @@ export function ProfileCurveEditor({ profile, onChange, startLabel, endLabel }: 
   function handleBackgroundClick(e: React.MouseEvent<SVGSVGElement>) {
     const local = toLocal(e);
     if (!local) return;
-    const candidate = fromScreen(local.x, local.y);
+    const candidate = fromScreen(local.x, local.y, flipZ);
     let insertAt = points.findIndex((p) => p.r > candidate.r);
     if (insertAt === -1) insertAt = points.length - 1;
     if (insertAt <= 0) insertAt = 1;
@@ -113,7 +138,7 @@ export function ProfileCurveEditor({ profile, onChange, startLabel, endLabel }: 
     if (draggingIndex === null) return;
     const local = toLocal(e);
     if (!local) return;
-    updatePoint(draggingIndex, fromScreen(local.x, local.y));
+    updatePoint(draggingIndex, fromScreen(local.x, local.y, flipZ));
   }
 
   function handleRemovePoint(index: number, e: React.MouseEvent) {
@@ -136,9 +161,9 @@ export function ProfileCurveEditor({ profile, onChange, startLabel, endLabel }: 
         onPointerUp={() => setDraggingIndex(null)}
       >
         <rect x={PAD} y={PAD} width={WIDTH - 2 * PAD} height={HEIGHT - 2 * PAD} className="profile-curve-bg" />
-        <path d={curvePathData(profile)} className="profile-curve-path" />
+        <path d={curvePathData(profile, flipZ)} className="profile-curve-path" />
         {points.map((p, i) => {
-          const { x, y } = toScreen(p);
+          const { x, y } = toScreen(p, flipZ);
           return (
             <circle
               key={i}
@@ -153,10 +178,10 @@ export function ProfileCurveEditor({ profile, onChange, startLabel, endLabel }: 
           );
         })}
         <text x={PAD} y={PAD - 6} className="profile-curve-axis-label">
-          Shallow
+          {flipZ ? "Deep" : "Shallow"}
         </text>
         <text x={PAD} y={HEIGHT - PAD + 14} className="profile-curve-axis-label">
-          Deep
+          {flipZ ? "Shallow" : "Deep"}
         </text>
         <text x={PAD} y={HEIGHT - 4} className="profile-curve-axis-label">
           {startLabel}

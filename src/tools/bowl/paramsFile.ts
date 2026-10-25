@@ -5,6 +5,7 @@ import type { SteppingModel } from "../../geometry/profile";
 import type { AnchorPosition } from "../../svg/anchor";
 
 const MODELS: SteppingModel[] = ["radial", "circumferential", "hybrid", "horizontal"];
+const INTERIOR_PROFILE_SHAPES: NonNullable<BowlParams["interiorProfileShape"]>[] = ["elliptical", "circular"];
 const MACHINING_MODES: NonNullable<BowlParams["machining"]>[] = ["two-sided", "interior-only", "exterior-only"];
 const ANCHOR_POSITIONS: AnchorPosition[] = [
   "top-left",
@@ -54,6 +55,9 @@ export function bowlParamsToFields(p: BowlParams): ParamField[] {
   }
   if (p.customInteriorProfile) {
     fields.push({ label: "Custom Interior Profile", value: "yes (not restored by this file — redraw it separately)" });
+  } else {
+    fields.push({ label: "Interior Profile Shape", value: p.interiorProfileShape ?? "elliptical" });
+    if (p.flatBottomDiameter) fields.push({ label: "Flat Bottom Diameter", value: p.flatBottomDiameter });
   }
   if (p.customExteriorProfile) {
     fields.push({ label: "Custom Exterior Profile", value: "yes (not restored by this file — redraw it separately)" });
@@ -111,6 +115,12 @@ export function parseBowlParams(text: string, defaults: BowlParams): ParsedBowlP
   const machining: NonNullable<BowlParams["machining"]> = MACHINING_MODES.includes(rawMachining as never)
     ? (rawMachining as NonNullable<BowlParams["machining"]>)
     : (defaults.machining ?? "two-sided");
+  const rawInteriorProfileShape = raw["Interior Profile Shape"];
+  const interiorProfileShape: NonNullable<BowlParams["interiorProfileShape"]> = INTERIOR_PROFILE_SHAPES.includes(
+    rawInteriorProfileShape as never,
+  )
+    ? (rawInteriorProfileShape as NonNullable<BowlParams["interiorProfileShape"]>)
+    : (defaults.interiorProfileShape ?? "elliptical");
 
   const params: BowlParams = {
     ...defaults,
@@ -132,6 +142,8 @@ export function parseBowlParams(text: string, defaults: BowlParams): ParsedBowlP
     includeBoundingBox: bool("Include Bounding Box", defaults.includeBoundingBox ?? false),
     maxPathsPerFile: Math.round(num("Max Paths Per File", defaults.maxPathsPerFile ?? 250)),
     machining,
+    interiorProfileShape,
+    flatBottomDiameter: numOrUndefined("Flat Bottom Diameter") ?? 0,
     // Custom shape/profile aren't restorable from this file — never carried over,
     // even if `defaults` happened to have one from the current session.
     customShape: undefined,

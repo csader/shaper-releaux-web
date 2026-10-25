@@ -170,6 +170,14 @@ header h1 {
   gap: 1rem;
 }
 
+.cross-section-wrap {
+  margin-top: 1rem;
+}
+
+.cross-section-wrap h3 {
+  margin-bottom: 0.4rem;
+}
+
 .svg-box {
   background: #fff;
   border-radius: 6px;
@@ -467,7 +475,7 @@ header h1 {
 
 .profile-curve-svg {
   width: 100%;
-  max-width: 320px;
+  max-width: 480px;
   background: #1a1a1f;
   border: 1px solid #3c3c44;
   border-radius: 6px;

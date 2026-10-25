@@ -1,6 +1,15 @@
 import { useMemo, useRef, useState } from "react";
-import { generateBowl, boundingBoxFor, shapeCenterFor, type BowlParams } from "./generate";
+import {
+  generateBowl,
+  boundingBoxFor,
+  shapeCenterFor,
+  buildInteriorCurve,
+  buildExteriorCurve,
+  exteriorStartFor,
+  type BowlParams,
+} from "./generate";
 import { CustomShapeImport } from "./CustomShapeImport";
+import { CrossSectionPreview } from "./CrossSectionPreview";
 import type { Sides } from "../../geometry/shapes";
 import type { SteppingModel } from "../../geometry/profile";
 import { downloadAllAsZip, downloadFile } from "../../download/download";
@@ -211,7 +220,7 @@ export function BowlTool({ unit }: { unit: Unit }) {
   // Kept as separate local state (not folded directly into `params`) so switching
   // back to Parametric doesn't discard a drawn curve — only merged into the params
   // actually sent to generateBowl (below) when its mode is "custom".
-  const [interiorProfileMode, setInteriorProfileMode] = useState<"parametric" | "custom">("parametric");
+  const [interiorProfileMode, setInteriorProfileMode] = useState<"elliptical" | "circular" | "custom">("elliptical");
   const [exteriorProfileMode, setExteriorProfileMode] = useState<"parametric" | "custom">("parametric");
   const [interiorProfile, setInteriorProfile] = useState<CustomProfile>(DEFAULT_INTERIOR_PROFILE);
   const [exteriorProfile, setExteriorProfile] = useState<CustomProfile>(DEFAULT_EXTERIOR_PROFILE);
@@ -232,7 +241,7 @@ export function BowlTool({ unit }: { unit: Unit }) {
       // this file (see paramsFile.ts) — parseBowlParams already strips them from
       // `restored`, so these modes/toggles are reset to match rather than left
       // pointing at now-stale local editor state.
-      setInteriorProfileMode("parametric");
+      setInteriorProfileMode(restored.interiorProfileShape === "circular" ? "circular" : "elliptical");
       setExteriorProfileMode("parametric");
       setUseZTouchBlock(restored.zTouchHeight !== restored.outerDepth);
       setIndependentFinishingModel(restored.interiorModel !== restored.exteriorModel);
@@ -282,7 +291,15 @@ export function BowlTool({ unit }: { unit: Unit }) {
     zTouchHeight: effectiveZTouchHeight,
     customInteriorProfile: interiorProfileMode === "custom" ? interiorProfile : undefined,
     customExteriorProfile: exteriorProfileMode === "custom" ? exteriorProfile : undefined,
+    interiorProfileShape: interiorProfileMode === "circular" ? "circular" : "elliptical",
   };
+
+  // Cross-section is shape-agnostic (every outline is a uniform scale of R(θ) at
+  // every ring, regardless of polygon shape), so it's shown for every shape,
+  // including custom ones — just not for whichever surface machining mode excludes.
+  const crossSectionInteriorCurve = isExteriorOnly ? null : buildInteriorCurve(effectiveParams);
+  const crossSectionExteriorCurve = isInteriorOnly ? null : buildExteriorCurve(effectiveParams);
+  const crossSectionExteriorStart = exteriorStartFor(effectiveParams);
 
   const files = useMemo(() => {
     if (isCustom && !params.customShape) return [];
@@ -416,19 +433,35 @@ export function BowlTool({ unit }: { unit: Unit }) {
                 <span>Interior profile</span>
                 <select
                   value={interiorProfileMode}
-                  onChange={(e) => setInteriorProfileMode(e.target.value as "parametric" | "custom")}
+                  onChange={(e) => setInteriorProfileMode(e.target.value as "elliptical" | "circular" | "custom")}
                 >
-                  <option value="parametric">Parametric (default)</option>
+                  <option value="elliptical">Elliptical (default)</option>
+                  <option value="circular">Circular (best for shallow carves)</option>
                   <option value="custom">Custom curve</option>
                 </select>
               </label>
-              {interiorProfileMode === "custom" && (
+              {interiorProfileMode === "custom" ? (
                 <ProfileCurveEditor
                   profile={interiorProfile}
                   onChange={setInteriorProfile}
                   startLabel="Center"
                   endLabel="Rim"
                 />
+              ) : (
+                <>
+                  <NumberField
+                    label="Flat bottom diameter (0 = pointed/rounded center)"
+                    valueMm={params.flatBottomDiameter ?? 0}
+                    onChangeMm={(v) => set("flatBottomDiameter", v)}
+                    unit={unit}
+                  />
+                  {(params.flatBottomDiameter ?? 0) > 0 && (
+                    <p className="hint-note">
+                      For tray-style carves: leaves a flat disc at the full Inner depth instead of tapering to a
+                      point — rough it out with a flat bit, then switch to ball-nose for the curved wall.
+                    </p>
+                  )}
+                </>
               )}
             </>
           )}
@@ -451,6 +484,7 @@ export function BowlTool({ unit }: { unit: Unit }) {
                     onChange={setExteriorProfile}
                     startLabel="Foot"
                     endLabel="Rim"
+                    flipZ
                   />
                   <p className="hint-note">
                     A custom exterior curve replaces the foot entirely — draw whatever taper (or none) you want
@@ -757,6 +791,17 @@ export function BowlTool({ unit }: { unit: Unit }) {
               <div className="svg-box" dangerouslySetInnerHTML={{ __html: interiorPreviewHtml }} />
             </div>
           )}
+        </div>
+
+        <div className="cross-section-wrap">
+          <h3>Cross-section</h3>
+          <CrossSectionPreview
+            interiorCurve={crossSectionInteriorCurve}
+            exteriorCurve={crossSectionExteriorCurve}
+            exteriorStart={crossSectionExteriorStart}
+            outerDiameter={params.outerDiameter}
+            outerDepth={params.outerDepth}
+          />
         </div>
 
         <div className="downloads">

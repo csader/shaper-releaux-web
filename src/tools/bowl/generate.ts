@@ -9,6 +9,7 @@ import {
   type SteppingModel,
 } from "../../geometry/profile";
 import { toProfileCurve, type CustomProfile } from "../../geometry/customProfile";
+import { circularInteriorProfile } from "../../geometry/circularProfile";
 import { solveThetaForDepth } from "../../geometry/invert";
 import { shapeOutline, type Sides } from "../../geometry/shapes";
 import { oddCircumradius } from "../../geometry/reuleauxPolygon";
@@ -63,9 +64,36 @@ export interface BowlParams {
    * everything from its own starting point (whatever that is) out to the rim. */
   customInteriorProfile?: CustomProfile;
   customExteriorProfile?: CustomProfile;
+  /** Interior profile shape, when not using a hand-drawn custom curve (that always
+   * takes priority over this). "circular" is the original author's alternative to
+   * the default elliptical formula — a circle centred above the workpiece, "best
+   * suited to shallow carves" per his own notes; he settled on elliptical for bowls
+   * generally, so this is offered as a choice, not a new default. Exterior doesn't
+   * get this option (yet) — its foot taper blend has no documented circular analog. */
+  interiorProfileShape?: "elliptical" | "circular";
+  /** "For tray style carves, I make the calculations for either profile, for a bowl
+   * only the width of the curved portion, then adjust each width by the dimensions
+   * of the flat bottom" — per the original author's own forum notes. Leaves a flat
+   * disc of this diameter at the full innerDepth instead of tapering to a point;
+   * the curved wall (elliptical or circular, whichever is selected) runs from its
+   * edge out to the rim. Ignored when using a hand-drawn custom curve — draw the
+   * flat yourself if you want one there. Interior-only, like interiorProfileShape. */
+  flatBottomDiameter?: number;
 }
 
 const ROUGH_Z_STEP = 4; // mm, per the vertical model used for all roughing passes
+
+/** Shifts a curve's R (diameter) outward by a constant amount, leaving Z untouched —
+ * the "flat bottom" trick: the wrapped curve was built from innerDiameter minus the
+ * flat disc's own diameter, so shifting back out by that same diameter makes the
+ * curved wall start exactly at the flat disc's edge instead of at R=0. */
+function withFlatBottom(curve: ProfileCurve, flatBottomDiameter: number): ProfileCurve {
+  if (flatBottomDiameter <= 0) return curve;
+  return (theta) => {
+    const { R, Z } = curve(theta);
+    return { R: R + flatBottomDiameter, Z };
+  };
+}
 
 function minCuttableDiameter(bitSize: number, mmCut: number): number {
   return bitSize + 2 * mmCut;
@@ -96,6 +124,67 @@ export function shapeCenterFor(params: Pick<BowlParams, "sides" | "outerDiameter
     cy -= oddCircumradius(params.sides, params.outerDiameter) - params.outerDiameter / 2;
   }
   return { cx, cy };
+}
+
+/** Where the exterior curve's own domain starts — 0 for a custom curve (no separate
+ * foot concept), the formula-derived foot angle otherwise. Exposed so the UI can
+ * sample buildExteriorCurve over the right range for a cross-section preview. */
+export function exteriorStartFor(params: Pick<BowlParams, "outerDiameter" | "footDiameter" | "customExteriorProfile">): number {
+  return params.customExteriorProfile ? 0 : footAngleDeg(params.outerDiameter, params.footDiameter);
+}
+
+/** The exterior's R/Z profile curve for the given params — exposed so the UI can
+ * sample it for a cross-section preview without duplicating this selection logic
+ * (custom curve vs. the parametric foot-taper formula). generateBowl itself calls
+ * this too, rather than inlining it. */
+export function buildExteriorCurve(
+  params: Pick<
+    BowlParams,
+    "outerDiameter" | "outerDepth" | "footHeight" | "footDiameter" | "zTouchHeight" | "customExteriorProfile"
+  >,
+): ProfileCurve {
+  const { outerDiameter, outerDepth, footHeight, footDiameter, zTouchHeight, customExteriorProfile } = params;
+  const footAngle = footAngleDeg(outerDiameter, footDiameter);
+  const offset = outerDepth - zTouchHeight;
+  return customExteriorProfile
+    ? toProfileCurve(customExteriorProfile, outerDiameter, outerDepth, offset)
+    : (theta) => ({
+        R: exteriorDiameter(theta, outerDiameter),
+        Z: exteriorDepth(theta, { outerDepth, footHeight, zTouchHeight }, footAngle),
+      });
+}
+
+/** The interior's R/Z profile curve for the given params — same reasoning as
+ * buildExteriorCurve. Handles the elliptical/circular choice and the flat-bottom
+ * shift; a custom curve overrides both. */
+export function buildInteriorCurve(
+  params: Pick<
+    BowlParams,
+    | "innerDiameter"
+    | "innerDepth"
+    | "outerDepth"
+    | "zTouchHeight"
+    | "interiorProfileShape"
+    | "flatBottomDiameter"
+    | "customInteriorProfile"
+  >,
+): ProfileCurve {
+  const { innerDiameter, innerDepth, outerDepth, zTouchHeight, interiorProfileShape = "elliptical", customInteriorProfile } =
+    params;
+  const offset = outerDepth - zTouchHeight;
+  const flatBottomDiameter = customInteriorProfile ? 0 : (params.flatBottomDiameter ?? 0);
+  const curvedInnerDiameter = Math.max(innerDiameter - flatBottomDiameter, 0);
+  return customInteriorProfile
+    ? toProfileCurve(customInteriorProfile, innerDiameter, innerDepth, offset)
+    : withFlatBottom(
+        interiorProfileShape === "circular"
+          ? circularInteriorProfile(curvedInnerDiameter, innerDepth, outerDepth, zTouchHeight)
+          : (theta) => ({
+              R: interiorDiameter(theta, curvedInnerDiameter),
+              Z: interiorDepth(theta, innerDepth, outerDepth, zTouchHeight),
+            }),
+        flatBottomDiameter,
+      );
 }
 
 const SIDE_NAMES: Partial<Record<Sides, string>> = {
@@ -143,16 +232,16 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
     machining = "two-sided",
     customInteriorProfile,
     customExteriorProfile,
+    interiorProfileShape = "elliptical",
   } = params;
 
   if (sides === "custom" && !customShape) {
     throw new Error("A custom shape must be provided when sides is \"custom\".");
   }
 
-  const footAngle = footAngleDeg(outerDiameter, footDiameter);
   // A custom exterior curve has no separate foot concept — it starts wherever its
   // first drawn point is, not at a formula-derived foot angle.
-  const exteriorStart = customExteriorProfile ? 0 : footAngle;
+  const exteriorStart = exteriorStartFor(params);
   const box = boundingBoxFor(params);
   const boundingWidth = box.width;
   const boundingHeight = box.height;
@@ -197,26 +286,19 @@ export function generateBowl(params: BowlParams): GeneratedFile[] {
     "Inner Depth": innerDepth,
     // No separate foot concept once the exterior is a hand-drawn curve.
     ...(customExteriorProfile ? {} : { "Foot Height": footHeight, "Foot Diameter": footDiameter }),
+    ...(customInteriorProfile
+      ? {}
+      : {
+          "Interior Profile Shape": interiorProfileShape,
+          ...(params.flatBottomDiameter ? { "Flat Bottom Diameter": params.flatBottomDiameter } : {}),
+        }),
     "Z Touch Height": zTouchHeight,
     "Bit Size": bitSize,
     "MM Cut": mmCut,
   };
 
-  // Same (outerDepth − zTouchHeight) reference the parametric formulas already
-  // subtract — a custom profile responds to the Z-touch-height setting identically.
-  const offset = outerDepth - zTouchHeight;
-  const exteriorCurve: ProfileCurve = customExteriorProfile
-    ? toProfileCurve(customExteriorProfile, outerDiameter, outerDepth, offset)
-    : (theta) => ({
-        R: exteriorDiameter(theta, outerDiameter),
-        Z: exteriorDepth(theta, { outerDepth, footHeight, zTouchHeight }, footAngle),
-      });
-  const interiorCurve: ProfileCurve = customInteriorProfile
-    ? toProfileCurve(customInteriorProfile, innerDiameter, innerDepth, offset)
-    : (theta) => ({
-        R: interiorDiameter(theta, innerDiameter),
-        Z: interiorDepth(theta, innerDepth, outerDepth, zTouchHeight),
-      });
+  const exteriorCurve: ProfileCurve = buildExteriorCurve(params);
+  const interiorCurve: ProfileCurve = buildInteriorCurve(params);
   const exteriorD = (theta: number) => exteriorCurve(theta).R;
   const exteriorZ = (theta: number) => exteriorCurve(theta).Z;
   const interiorD = (theta: number) => interiorCurve(theta).R;

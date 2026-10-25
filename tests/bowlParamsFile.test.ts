@@ -41,6 +41,8 @@ describe("bowl paramsFile round-trip", () => {
       maxPathsPerFile: 200,
       machining: "interior-only",
       anchor: { enabled: true, position: "bottom-right" },
+      interiorProfileShape: "elliptical",
+      flatBottomDiameter: 0,
     };
     const text = serializeParamsFile("Bowl", bowlParamsToFields(params));
     const { params: restored, warnings } = parseBowlParams(text, DEFAULTS);
@@ -54,6 +56,14 @@ describe("bowl paramsFile round-trip", () => {
     const { params: restored } = parseBowlParams(text, DEFAULTS);
     expect(restored.outerDiameterY).toBe(180);
     expect(restored.innerDiameterY).toBe(160);
+  });
+
+  it("restores a circular interior profile with a flat bottom diameter", () => {
+    const params: BowlParams = { ...DEFAULTS, interiorProfileShape: "circular", flatBottomDiameter: 40 };
+    const text = serializeParamsFile("Bowl", bowlParamsToFields(params));
+    const { params: restored } = parseBowlParams(text, DEFAULTS);
+    expect(restored.interiorProfileShape).toBe("circular");
+    expect(restored.flatBottomDiameter).toBe(40);
   });
 
   it("restores custom anchor X/Y coordinates", () => {
